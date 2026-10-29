@@ -380,7 +380,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | B3 自动同步开关 | 已完成 | `core.test.mjs` 表驱动 + `reliability.mjs`（关闭后编辑保持 dirty，手动同步上传） | `syncNow` 统一判断，用户操作走 `manual: true` |
 | B4 对话框 resolver 并发 | 已完成 | `web-tests/unit/dialog.test.mjs`（重复调用结算旧值、不重复 showModal、可重开） | 新增 `web/lib/dialog.js`，解锁/导入解密/Passkey 统一使用 |
 | B5 Service Worker 导航缓存 | 已完成 | `sw-policy.test.mjs`（仅 `/`、`/index.html`、`/ai` 可写入 shell） | 新增 `web/lib/sw-policy.js`，SW 通过 `importScripts` 复用 |
-| B6 桌面侧栏 hidden 焦点 | 待开始 | | |
+| B6 桌面侧栏 hidden 焦点 | 已完成 | `reliability.mjs`（hidden 时 `inert`、`aria-hidden=true`，展开后恢复） | 桌面 hidden 也设 `inert`，焦点移到唤出按钮 |
 | B7 会话续期失败降级 | 待开始 | | |
 | B8 workspace 缺失行自愈 | 待开始 | | |
 | B9 安全默认 | 待开始 | | |

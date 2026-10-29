@@ -1202,8 +1202,15 @@
     } else {
       delete root.dataset.drawer;
       dom.sidebarScrim.hidden = true;
-      dom.sidebar.inert = false;
-      dom.sidebar.removeAttribute('aria-hidden');
+      // 桌面端完全隐藏侧栏时也要 inert，否则 Tab 仍会进入视觉上不可见的
+      // 链接；焦点先移到屏幕边缘的唤出按钮，再标记 aria-hidden。
+      const hidden = mode === 'hidden';
+      dom.sidebar.inert = hidden;
+      if (hidden && dom.sidebar.contains(document.activeElement)) {
+        dom.sidebarReveal.focus();
+      }
+      if (hidden) dom.sidebar.setAttribute('aria-hidden', 'true');
+      else dom.sidebar.removeAttribute('aria-hidden');
       const collapsed = mode === 'collapsed';
       dom.sidebarCollapse.setAttribute('aria-label', collapsed ? '展开侧栏' : '收起侧栏');
       dom.sidebarCollapse.title = collapsed ? '展开侧栏 (Alt+S)' : '收起侧栏 (Alt+S)';

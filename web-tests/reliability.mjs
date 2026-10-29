@@ -128,6 +128,20 @@ async function main() {
   const autoSyncInfo = JSON.parse(autoSync.value || '{}');
   check('auto sync off keeps edits local until a manual sync', autoSyncInfo.dirty === 'dirty' && autoSyncInfo.beforeHas === false && autoSyncInfo.afterHas === true, autoSync.value);
 
+  // B6：桌面端隐藏侧栏后必须 inert，Tab 不能进入不可见链接。
+  const hiddenSidebar = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="appearance"]').click(); await sleep(200);
+    const select=document.getElementById('set-sidebar');
+    select.value='hidden'; select.dispatchEvent(new Event('change',{bubbles:true})); await sleep(250);
+    const sidebar=document.getElementById('sidebar');
+    const hiddenState={inert:sidebar.inert, aria:sidebar.getAttribute('aria-hidden'), revealHidden:document.getElementById('sidebar-reveal').hidden};
+    select.value='expanded'; select.dispatchEvent(new Event('change',{bubbles:true})); await sleep(250);
+    document.getElementById('hub-dialog').close();
+    return JSON.stringify({hiddenState, restoredInert:sidebar.inert});})()`);
+  const hiddenSidebarInfo = JSON.parse(hiddenSidebar.value || '{}');
+  check('hidden desktop sidebar is inert and restorable', hiddenSidebarInfo.hiddenState && hiddenSidebarInfo.hiddenState.inert === true && hiddenSidebarInfo.hiddenState.aria === 'true' && hiddenSidebarInfo.restoredInert === false, hiddenSidebar.value);
+
   const avatar = await tab1.evaluate(`JSON.stringify((()=>{const m=document.getElementById('account-avatar-mini');return {text:m.textContent.trim(),art:!!m.querySelector('.avatar-art'),index:m.dataset.avatar};})())`);
   const avatarInfo = JSON.parse(avatar.value || '{}');
   check('account avatar comes from the DiceBear library', avatarInfo.text === '' && avatarInfo.art === true && /^\d+$/.test(avatarInfo.index || '') && Number(avatarInfo.index) < 24, avatar.value);
