@@ -722,41 +722,9 @@
     return doc;
   }
 
-  // 与服务端限额保持一致；超出时优先丢弃墓碑，再丢弃较早的项目。
+  // 限额逻辑是纯函数，放在 lib/core.js 里做表驱动测试；这里只绑定本应用的限额。
   function enforceLimits(doc) {
-    let dropped = 0;
-
-    if (doc.groups.length > MAX_GROUPS) {
-      const sorted = [...doc.groups].sort(
-        (a, b) =>
-          (a.deletedAt ? 1 : 0) - (b.deletedAt ? 1 : 0) || (a.updatedAt || 0) - (b.updatedAt || 0)
-      );
-      const keep = new Set(sorted.slice(0, MAX_GROUPS).map((group) => group.id));
-      dropped += doc.groups.length - MAX_GROUPS;
-      doc.groups = doc.groups.filter((group) => keep.has(group.id));
-    }
-
-    let total = 0;
-    doc.groups.forEach((group) => {
-      if (group.deletedAt) return;
-      const sorted = [...group.links].sort(
-        (a, b) =>
-          (a.deletedAt ? 1 : 0) - (b.deletedAt ? 1 : 0) || (a.updatedAt || 0) - (b.updatedAt || 0)
-      );
-      const kept = [];
-      sorted.forEach((link) => {
-        if (total < MAX_LINKS) {
-          kept.push(link);
-          total++;
-        } else {
-          dropped++;
-        }
-      });
-      kept.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
-      group.links = kept;
-    });
-
-    return dropped;
+    return core.enforceLimits(doc, { maxGroups: MAX_GROUPS, maxLinks: MAX_LINKS });
   }
 
   function countLinks(doc) {

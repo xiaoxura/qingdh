@@ -368,3 +368,30 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | 审计 | `internal/httpapi/audit.go`、`internal/store/audit.go`、`migrations/0007_audit_log.sql` |
 | 后台 | `web/admin.html`、`web/admin.js`、`internal/httpapi/admin_handlers.go` |
 | 回归 | `web-tests/reliability.mjs`、`web-tests/unit/` |
+
+## 11. 实施进度
+
+> 本文只追加状态，不改写上面的计划正文。每项完成后更新对应行。
+
+| 工作项 | 状态 | 验证 | 备注 |
+| --- | --- | --- | --- |
+| B1 限额保留策略 | 已完成 | `node --test web-tests/unit/core.test.mjs`（含 51 组/501 链接、公平配额、墓碑优先） | `enforceLimits` 抽到 `web/lib/core.js` |
+| B2 自定义搜索引擎 | 待开始 | | |
+| B3 自动同步开关 | 待开始 | | |
+| B4 对话框 resolver 并发 | 待开始 | | |
+| B5 Service Worker 导航缓存 | 待开始 | | |
+| B6 桌面侧栏 hidden 焦点 | 待开始 | | |
+| B7 会话续期失败降级 | 待开始 | | |
+| B8 workspace 缺失行自愈 | 待开始 | | |
+| B9 安全默认 | 待开始 | | |
+| A1 登录密码修改 | 待开始 | | |
+| A2 邮箱修改 | 待开始 | | |
+| A3 恢复码重新生成 | 待开始 | | |
+| A4 关闭加密 | 待开始 | | 本轮实施（以任务提示词为准） |
+| A5 服务端版本历史 | 待开始 | | |
+| A6 审计日志后台 | 待开始 | | |
+| A7 发布收口 | 待开始 | | 仅本地版本号、构建与文档；不推送 |
+| C1 拆分 app.js | 待开始 | | |
+| C2 补测试 | 待开始 | | |
+| C3 同步效率 | 待开始 | | |
+| C4 首屏瘦身 | 待开始 | | |
