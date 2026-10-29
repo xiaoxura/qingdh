@@ -553,3 +553,42 @@ func TestRegistrationCanBeDisabled(t *testing.T) {
 		t.Fatalf("status = %d %s", resp.status, resp.body)
 	}
 }
+
+// TestWorkspaceRecoversMissingRow 覆盖 B8：documents 行缺失时，GET 有 fallback，
+// PUT 也必须能按 revision 0 自愈，而不是永久 409。
+func TestWorkspaceRecoversMissingRow(t *testing.T) {
+	env := newEnv(t, nil)
+	c := env.client(t)
+	registerVerified(t, env, c, "self-heal@example.com", "correct horse battery")
+
+	got := c.do(http.MethodGet, "/api/v1/workspace", "")
+	if got.status != http.StatusOK {
+		t.Fatalf("initial get = %d %s", got.status, got.body)
+	}
+
+	user, err := env.store.UserByEmail(t.Context(), "self-heal@example.com")
+	if err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if _, err := env.store.Exec(t.Context(), `DELETE FROM documents WHERE user_id = $1`, user.ID); err != nil {
+		t.Fatalf("delete document: %v", err)
+	}
+
+	payload := `{"version":2,"settings":{},"groups":[{"id":"g1","name":"恢复","links":[]}]}`
+	put := c.do(http.MethodPut, "/api/v1/workspace", fmt.Sprintf(`{"baseRevision":0,"payload":%s}`, payload))
+	if put.status != http.StatusOK {
+		t.Fatalf("put after missing row = %d %s", put.status, put.body)
+	}
+	if !strings.Contains(put.body, `"revision":1`) {
+		t.Fatalf("expected the row to be recreated at revision 1: %s", put.body)
+	}
+
+	// 不存在的行 + 非 0 baseRevision 仍然是冲突，不能凭空覆盖。
+	if _, err := env.store.Exec(t.Context(), `DELETE FROM documents WHERE user_id = $1`, user.ID); err != nil {
+		t.Fatalf("delete document again: %v", err)
+	}
+	stale := c.do(http.MethodPut, "/api/v1/workspace", fmt.Sprintf(`{"baseRevision":3,"payload":%s}`, payload))
+	if stale.status != http.StatusConflict {
+		t.Fatalf("stale base on missing row = %d %s", stale.status, stale.body)
+	}
+}

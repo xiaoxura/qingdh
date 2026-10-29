@@ -382,7 +382,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | B5 Service Worker 导航缓存 | 已完成 | `sw-policy.test.mjs`（仅 `/`、`/index.html`、`/ai` 可写入 shell） | 新增 `web/lib/sw-policy.js`，SW 通过 `importScripts` 复用 |
 | B6 桌面侧栏 hidden 焦点 | 已完成 | `reliability.mjs`（hidden 时 `inert`、`aria-hidden=true`，展开后恢复） | 桌面 hidden 也设 `inert`，焦点移到唤出按钮 |
 | B7 会话续期失败降级 | 已完成 | `TestRenewalFailureDoesNotRejectRequest`（触发器模拟续期写库失败，请求仍 200；恢复后续期继续） | `Authenticate` 不再向中间件返回续期错误 |
-| B8 workspace 缺失行自愈 | 待开始 | | |
+| B8 workspace 缺失行自愈 | 已完成 | `TestWorkspaceRecoversMissingRow`（删行后 PUT 重建 revision 1；非 0 base 仍 409） | `UpdateDocument` 对齐 `PutSecret` |
 | B9 安全默认 | 待开始 | | |
 | A1 登录密码修改 | 待开始 | | |
 | A2 邮箱修改 | 待开始 | | |
