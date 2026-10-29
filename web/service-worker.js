@@ -8,8 +8,11 @@
 'use strict';
 
 // 每次发布前端资源时递增版本号；新版本安装后等待用户确认再接管。
-const VERSION = '20261029-38';
+const VERSION = '20261029-39';
 const CACHE_NAME = `qingdh-shell-${VERSION}`;
+
+// 导航缓存判定单独成模块，便于 node:test 覆盖（B5）。
+importScripts(`/lib/sw-policy.js?v=${VERSION}`);
 const SHELL_PATHS = [
   '/',
   '/index.html',
@@ -20,6 +23,7 @@ const SHELL_PATHS = [
   '/select.css',
   '/lib/core.js',
   '/lib/dialog.js',
+  '/lib/sw-policy.js',
   '/select.js',
   '/crypto.js',
   '/device-vault.js',
@@ -78,12 +82,17 @@ self.addEventListener('fetch', (event) => {
   if (!isCacheable(request)) return;
 
   if (request.mode === 'navigate') {
+    const pathname = new URL(request.url).pathname;
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          const stored = caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
-          event.waitUntil(stored.catch(() => {}));
+          // 只允许真实的 app shell 入口覆盖离线页；404 页面、/admin 和邮件
+          // 确认页绝不能写进 shell 缓存。
+          if (response.ok && self.QingdhSWPolicy.isShellNavigation(pathname)) {
+            const copy = response.clone();
+            const stored = caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
+            event.waitUntil(stored.catch(() => {}));
+          }
           return response;
         })
         .catch(() => caches.match('/index.html'))
