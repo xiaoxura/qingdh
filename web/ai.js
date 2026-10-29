@@ -44,6 +44,7 @@
   const deps = {
     toast: () => {},
     openAccountDialog: () => {},
+    openEncryptionSettings: () => {},
     focusSearch: () => {},
     openURL: (url) => {
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -583,7 +584,8 @@
     }
     if (!deps.isEncrypted()) {
       deps.toast('AI 密钥需要主加密保护，请先开启数据加密');
-      deps.openAccountDialog();
+      if (deps.openEncryptionSettings) deps.openEncryptionSettings();
+      else deps.openAccountDialog();
       return;
     }
     ensureConfig()
@@ -593,6 +595,16 @@
         if (deps.openAIConfig) deps.openAIConfig();
       })
       .catch((error) => deps.toast(error.message || '读取 AI 配置失败'));
+  }
+
+  async function prepareConfig() {
+    if (!deps.isLoggedIn() || !deps.isEncrypted()) return false;
+    await ensureConfig();
+    if (!dom.providerList || !dom.providerList.childElementCount) {
+      renderConfig();
+      autoFetchModels();
+    }
+    return true;
   }
 
   function escapeHTML(value) {
@@ -1269,7 +1281,8 @@
     }
     if (!deps.isEncrypted()) {
       deps.toast('AI 密钥需要主加密保护，请先开启数据加密');
-      deps.openAccountDialog();
+      if (deps.openEncryptionSettings) deps.openEncryptionSettings();
+      else deps.openAccountDialog();
       return;
     }
 
@@ -1784,6 +1797,8 @@
       dom.sources.hidden = true;
       dom.error.hidden = true;
       dom.stop.hidden = true;
+      if (dom.providerList) dom.providerList.innerHTML = '';
+      if (dom.configError) dom.configError.hidden = true;
       updateModeButton();
     }
   }
@@ -2000,6 +2015,7 @@
     ask,
     isActive,
     openConfig,
+    prepareConfig,
     closePanel,
     activeLabel: () => {
       const provider = activeProvider();

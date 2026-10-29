@@ -27,6 +27,7 @@
     openMemoById: (id) => {},
     openPrivacy: () => {},
     openSettings: () => {},
+    openAIConfig: () => {},
     openAccount: () => {},
     toggleTheme: () => {},
     toggleEdit: () => {},
@@ -139,7 +140,7 @@
           label: '开启 AI 搜索…',
           hint: 'AI',
           icon: 'ai',
-          run: () => deps.openSettings(),
+          run: () => (deps.openAIConfig ? deps.openAIConfig() : deps.openSettings()),
         });
       }
     }
@@ -151,8 +152,8 @@
       { id: 'open-settings', label: '打开设置', hint: '', icon: 'settings', run: () => deps.openSettings() },
       { id: 'toggle-theme', label: '切换明暗主题', hint: '', icon: 'theme', run: () => deps.toggleTheme() },
       { id: 'toggle-edit', label: '切换编辑模式', hint: '', icon: 'edit', run: () => deps.toggleEdit() },
-      { id: 'export-data', label: '导出数据', hint: '', icon: 'download', run: () => deps.exportData() },
-      { id: 'open-account', label: '账号与同步', hint: '', icon: 'account', run: () => deps.openAccount() },
+      { id: 'export-data', label: '导出备份', hint: '', icon: 'download', run: () => deps.exportData() },
+      { id: 'open-account', label: '账号与设备', hint: '', icon: 'account', run: () => deps.openAccount() },
     ];
 
     for (const action of actions) {

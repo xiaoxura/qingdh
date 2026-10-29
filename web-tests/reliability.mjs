@@ -176,6 +176,7 @@ async function main() {
   const privacy = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
     document.getElementById('settings-btn').click(); await sleep(400);
     document.querySelector('[data-hub-tab="privacy"]').click(); await sleep(250);
+    document.querySelector('[data-hub-subtab="privacy-space"]').click(); await sleep(250);
     document.getElementById('privacy-open-settings').click();
     for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('privacy-lock-dialog').open)break;}
     document.getElementById('privacy-password').value='privacy-regression-1';

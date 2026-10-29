@@ -1697,6 +1697,26 @@ dialog::backdrop {
   gap: 8px;
 }
 
+.data-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.data-block + .data-block {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.data-block .data-desc {
+  margin: 0;
+}
+
+.usage-empty .data-actions {
+  justify-content: center;
+  margin-top: 12px;
+}
+
 .confirm-message {
   margin: 0;
   font-size: 14px;
@@ -1930,49 +1950,6 @@ html[data-theme="dark"] .toast-action {
   color: var(--muted-2);
 }
 
-.sync-panel {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 16px;
-  padding: 9px 10px 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: var(--field);
-}
-
-.sync-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--muted-2);
-}
-
-.sync-dot.is-ok {
-  background: #22a06b;
-}
-
-.sync-dot.is-busy {
-  background: var(--accent);
-  animation: sync-pulse 1.2s ease-in-out infinite;
-}
-
-.sync-dot.is-warn {
-  background: #d99a00;
-}
-
-.sync-dot.is-error {
-  background: var(--danger);
-}
-
-.sync-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
 .btn-small {
   min-height: 40px;
   padding: 0 12px;
@@ -2138,12 +2115,6 @@ html[data-theme="dark"] .toast-action {
 
 .merge-foot {
   flex-wrap: wrap;
-}
-
-@keyframes sync-pulse {
-  50% {
-    opacity: 0.35;
-  }
 }
 
 /* ---------- 隐私空间 ---------- */
@@ -3876,13 +3847,6 @@ body.memo-open .page {
   opacity: 1;
 }
 
-.hub-menu-note {
-  margin: auto 10px 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--muted-2);
-}
-
 .hub-main {
   display: flex;
   flex-direction: column;
@@ -3926,24 +3890,50 @@ body.memo-open .page {
   gap: 14px;
 }
 
-.hub-section-title {
-  margin: 0 0 2px;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.4;
+.hub-subnav {
+  display: flex;
+  flex: none;
+  gap: 18px;
+  padding: 0 26px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+
+.hub-subnav::-webkit-scrollbar {
+  display: none;
+}
+
+.hub-subnav-item {
+  flex: none;
+  padding: 9px 1px 10px;
+  margin-bottom: -1px;
+  font-size: 12.5px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-subnav-item:hover {
   color: var(--text);
 }
 
-.hub-body > .hub-panel:not(.hub-group-start) > .hub-section-title:first-child {
-  margin-top: 24px;
-  padding-top: 18px;
-  border-top: 1px solid var(--border);
+.hub-subnav-item.is-active {
+  font-weight: 600;
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
-.hub-panel-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
+.hub-subhead {
+  margin: 8px 0 -4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.hub-subhead:first-child {
+  margin-top: 0;
 }
 
 .hub-foot {
@@ -3995,11 +3985,6 @@ body.memo-open .page {
     white-space: nowrap;
   }
 
-  .hub-menu-note,
-  .hub-menu-label {
-    display: none;
-  }
-
   .hub-nav {
     flex: 1;
     flex-direction: row;
@@ -4032,6 +4017,15 @@ body.memo-open .page {
 
   .hub-head {
     padding: 16px 16px 6px;
+  }
+
+  .hub-subnav {
+    gap: 16px;
+    padding: 0 16px;
+  }
+
+  .hub-subnav-item {
+    font-size: 12px;
   }
 
   .hub-body {
@@ -4144,15 +4138,6 @@ body.memo-open .page {
 }
 
 /* ---------- 调用概览 ---------- */
-
-.hub-menu-label {
-  padding: 8px 10px 2px;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--muted-2);
-}
 
 .usage-toolbar {
   display: flex;
@@ -5022,12 +5007,6 @@ body.batch-mode .link {
     min-width: 0;
   }
 
-  .hub-mobile-category label {
-    flex: none;
-    font-size: 11px;
-    color: var(--muted-2);
-  }
-
   .hub-mobile-category .qselect {
     flex: 1;
     min-width: 0;
@@ -5473,19 +5452,6 @@ body.ai-results-open .sidebar-fab {
 .engine-config-item.is-drag-over {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-.engine-ai-badge {
-  display: grid;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-radius: 7px;
-  place-items: center;
 }
 
 .engine-add-dialog {

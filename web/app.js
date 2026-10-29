@@ -260,15 +260,20 @@
     hubPanels: $$('[data-hub-panel]'),
     hubPanelTitle: $('#hub-panel-title'),
     hubPanelDesc: $('#hub-panel-desc'),
+    hubSubnav: $('#hub-subnav'),
     hubBody: $('#hub-body'),
     hubFootNote: $('#hub-foot-note'),
+    hubDone: $('#hub-done'),
     aiConfigSave: $('#ai-config-save'),
-    aiConfigOpen: $('#ai-config-open'),
+    aiConfigGate: $('#ai-config-gate'),
+    aiConfigGateTitle: $('#ai-config-gate-title'),
+    aiConfigGateDesc: $('#ai-config-gate-desc'),
+    aiConfigGateAction: $('#ai-config-gate-action'),
+    aiProviderList: $('#ai-provider-list'),
     setName: $('#set-name'),
     setDensity: $('#set-density'),
     setEngine: $('#set-engine'),
     engineConfigList: $('#engine-config-list'),
-    aiEngineConfigList: $('#ai-engine-config-list'),
     engineAddOpen: $('#engine-add-open'),
     engineAddDialog: $('#engine-add-dialog'),
     engineNewName: $('#engine-new-name'),
@@ -307,7 +312,6 @@
     accountAvatar: $('#account-avatar'),
     accountEmail: $('#account-email'),
     accountMeta: $('#account-meta'),
-    accountSecurityOpen: $('#account-security-open'),
     authNote: $('#auth-note'),
 
     loginForm: $('#login-form'),
@@ -331,9 +335,6 @@
     forgotSubmit: $('#forgot-submit'),
     forgotBack: $('#forgot-back'),
 
-    syncText: $('#sync-text'),
-    syncDot: $('#sync-dot'),
-    syncNowBtn: $('#sync-now'),
     syncPanel: $('[data-hub-panel="sync"]'),
     syncGuestPanel: $('#sync-guest-panel'),
     syncManagerPanel: $('#sync-manager-panel'),
@@ -345,6 +346,7 @@
     syncPageNow: $('#sync-page-now'),
     encryptionState: $('#encryption-state'),
     encryptionPanel: $('#encryption-panel'),
+    encryptionGuest: $('#encryption-guest'),
     encryptionHint: $('#encryption-hint'),
     encryptionEnable: $('#encryption-enable'),
     encryptionUnlock: $('#encryption-unlock'),
@@ -409,7 +411,6 @@
     sessionsBlock: $('#sessions-block'),
     sessionsList: $('#sessions-list'),
     adminLink: $('#admin-link'),
-    exportCloudBtn: $('#export-cloud'),
     logoutAllBtn: $('#logout-all'),
     logoutBtn: $('#logout'),
     deleteAccountBtn: $('#delete-account'),
@@ -1474,44 +1475,6 @@
         }
       </div>`;
     }).join('');
-    renderAIEngineSettings();
-  }
-
-  function renderAIEngineSettings() {
-    if (!dom.aiEngineConfigList) return;
-    const providers = globalThis.QingdhAI && QingdhAI.providerSummaries
-      ? QingdhAI.providerSummaries()
-      : [];
-    if (!providers.length) {
-      dom.aiEngineConfigList.innerHTML =
-        '<p class="engine-section-hint">登录并开启加密后，可在这里查看 AI 搜索供应商。</p>';
-      return;
-    }
-    dom.aiEngineConfigList.innerHTML = providers
-      .map((provider) => {
-        const status = !provider.enabled
-          ? '未启用'
-          : provider.hasKey
-            ? '已配置'
-            : provider.mode === 'web'
-              ? '网页型'
-              : '未配置 Key';
-        const mode =
-          provider.mode === 'proxy' ? '服务端代理' : provider.mode === 'direct' ? '浏览器直连' : '网页';
-        return `<div class="engine-config-item ai-engine-config-item" data-ai-config-row="${escapeHTML(
-          provider.id
-        )}">
-          <span class="engine-ai-badge" aria-hidden="true">AI</span>
-          <div class="engine-config-copy">
-            <span class="engine-config-name">${escapeHTML(provider.label)}</span>
-            <span class="engine-config-host">${mode} · ${status}</span>
-          </div>
-          <button class="btn btn-small" type="button" data-ai-config-open="${escapeHTML(
-            provider.id
-          )}">AI 配置</button>
-        </div>`;
-      })
-      .join('');
   }
 
   function setDefaultEngine(id) {
@@ -3109,16 +3072,6 @@
     dom.syncBadge.title = text;
     dom.syncBadge.setAttribute('aria-label', `${short}：${text}`);
 
-    dom.syncText.textContent = text;
-
-    const dot = dom.syncDot;
-    dot.classList.remove('is-ok', 'is-busy', 'is-warn', 'is-error');
-    if (sync.status === 'synced') dot.classList.add('is-ok');
-    else if (sync.status === 'syncing') dot.classList.add('is-busy');
-    else if (sync.status === 'dirty' || sync.status === 'paused') dot.classList.add('is-warn');
-    else if (sync.status === 'error' || sync.status === 'auth') dot.classList.add('is-error');
-
-    dom.syncNowBtn.disabled = !sync.user || sync.inFlight;
     dom.accountLabel.textContent = sync.user ? '账号' : '登录';
     dom.accountBtn.setAttribute('aria-label', sync.user ? '账号' : '登录');
     dom.accountBtn.title = sync.user ? '账号' : '登录';
@@ -3139,11 +3092,11 @@
     dom.accountGuest.hidden = Boolean(sync.user);
     dom.accountUser.hidden = !sync.user;
     if (dom.encryptionPanel) dom.encryptionPanel.hidden = !sync.user;
-    const securityGuest = $('#security-account-guest');
-    if (securityGuest) securityGuest.hidden = Boolean(sync.user);
+    if (dom.encryptionGuest) dom.encryptionGuest.hidden = Boolean(sync.user);
     dom.adminLink.hidden = !(sync.user && sync.user.isAdmin);
     updateEncryptionUI();
     updateDeviceUI();
+    updateAIConfigGate();
     if (dom.syncPanel && !dom.syncPanel.hidden) renderSyncManager();
   }
 
@@ -4566,41 +4519,42 @@
   const HUB_GROUPS = {
     account: 'account',
     appearance: 'appearance',
-    sidebar: 'appearance',
     search: 'search',
     ai: 'search',
     usage: 'search',
     sync: 'sync',
     data: 'sync',
     privacy: 'privacy',
+    encryption: 'privacy',
+    device: 'privacy',
+    'privacy-space': 'privacy',
   };
 
-  function prepareHubPanels() {
-    const order = ['account', 'appearance', 'sidebar', 'search', 'ai', 'usage', 'sync', 'data', 'privacy'];
-    const titles = {
-      sidebar: '侧栏',
-      search: '网页搜索',
-      ai: 'AI 配置',
-      usage: '调用概览',
-      data: '本地数据',
-    };
-    for (const key of order) {
-      const panel = dom.hubPanels.find((item) => item.dataset.hubPanel === key);
-      if (!panel) continue;
-      dom.hubBody.appendChild(panel);
-      panel.classList.toggle('hub-group-start', HUB_GROUPS[key] === key);
-      if (titles[key]) {
-        panel.insertAdjacentHTML('afterbegin', `<h3 class="hub-section-title">${titles[key]}</h3>`);
-      }
-    }
-    const privacy = dom.hubPanels.find((item) => item.dataset.hubPanel === 'privacy');
-    if (privacy && dom.encryptionPanel) {
-      privacy.insertAdjacentHTML('afterbegin', '<h3 class="hub-section-title">隐私空间</h3>');
-      privacy.insertAdjacentHTML('afterbegin', '<div class="usage-empty" id="security-account-guest" hidden>登录后可开启数据加密。</div>');
-      privacy.prepend(dom.encryptionPanel);
-      privacy.insertAdjacentHTML('afterbegin', '<h3 class="hub-section-title">数据加密</h3>');
-    }
-  }
+  const HUB_PANELS = {
+    account: ['account'],
+    appearance: ['appearance'],
+    search: ['search', 'ai', 'usage'],
+    sync: ['sync', 'data'],
+    privacy: ['encryption', 'device', 'privacy-space'],
+  };
+
+  const HUB_PANEL_LABELS = {
+    search: '网页搜索',
+    ai: 'AI 配置',
+    usage: '调用概览',
+    sync: '同步',
+    data: '数据管理',
+    encryption: '数据加密',
+    device: '本机解锁',
+    'privacy-space': '隐私空间',
+  };
+
+  const HUB_FOOT_NOTES = {
+    account: '登录状态与同步会自动更新',
+    search: '搜索设置即时保存',
+    ai: '修改 AI 配置后点击“保存 AI 配置”',
+    usage: '统计来自服务端调用记录',
+  };
 
   function syncSettingsUI() {
     dom.setName.value = data.settings.name;
@@ -4631,39 +4585,81 @@
     updateSnapshotButton();
   }
 
+  function renderHubSubnav(group, activePanel) {
+    if (!dom.hubSubnav) return;
+    const panels = HUB_PANELS[group] || [];
+    if (panels.length < 2) {
+      dom.hubSubnav.hidden = true;
+      dom.hubSubnav.innerHTML = '';
+      return;
+    }
+    const current = Array.from(dom.hubSubnav.querySelectorAll('[data-hub-subtab]')).map(
+      (button) => button.dataset.hubSubtab
+    );
+    if (current.join('|') !== panels.join('|')) {
+      dom.hubSubnav.innerHTML = panels
+        .map(
+          (key) =>
+            `<button class="hub-subnav-item" type="button" role="tab" data-hub-subtab="${key}">${escapeHTML(HUB_PANEL_LABELS[key] || key)}</button>`
+        )
+        .join('');
+    }
+    dom.hubSubnav.hidden = false;
+    dom.hubSubnav.querySelectorAll('[data-hub-subtab]').forEach((button) => {
+      const active = button.dataset.hubSubtab === activePanel;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+      button.tabIndex = active ? 0 : -1;
+    });
+  }
+
+  function updateAIConfigGate() {
+    if (!dom.aiConfigGate) return;
+    const eligible = Boolean(sync.user) && cryptoState.enabled;
+    dom.aiConfigGate.hidden = eligible;
+    if (dom.aiProviderList) dom.aiProviderList.hidden = !eligible;
+    if (eligible) return;
+    const needLogin = !sync.user;
+    if (dom.aiConfigGateTitle) {
+      dom.aiConfigGateTitle.textContent = needLogin ? '登录后配置 AI' : '开启数据加密后配置 AI';
+    }
+    if (dom.aiConfigGateDesc) {
+      dom.aiConfigGateDesc.textContent = needLogin
+        ? 'AI 供应商与 API Key 需要登录、并开启数据加密后才能保存。'
+        : 'AI 配置使用主数据密钥派生的子密钥加密，请先在“安全与隐私 → 数据加密”中开启。';
+    }
+    if (dom.aiConfigGateAction) {
+      dom.aiConfigGateAction.textContent = needLogin ? '去登录' : '去开启数据加密';
+    }
+  }
+
   function setHubTab(tab) {
-    const section = Object.prototype.hasOwnProperty.call(HUB_GROUPS, tab) ? tab : 'account';
-    const next = HUB_GROUPS[section];
+    const group = HUB_GROUPS[tab] || 'account';
+    const panels = HUB_PANELS[group];
+    const activePanel = panels.includes(tab) ? tab : panels[0];
 
     dom.hubTabs.forEach((button) => {
-      const active = button.dataset.hubTab === next;
+      const active = button.dataset.hubTab === group;
       button.classList.toggle('is-active', active);
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
     dom.hubPanels.forEach((panel) => {
-      panel.hidden = HUB_GROUPS[panel.dataset.hubPanel] !== next;
+      panel.hidden = panel.dataset.hubPanel !== activePanel;
     });
+    renderHubSubnav(group, activePanel);
 
-    if (dom.hubCategory && dom.hubCategory.value !== next) {
-      dom.hubCategory.value = next;
+    if (dom.hubCategory && dom.hubCategory.value !== group) {
+      dom.hubCategory.value = group;
       if (globalThis.QingdhSelect) QingdhSelect.sync(dom.hubCategory);
     }
-    const activeButton = dom.hubTabs.find((button) => button.dataset.hubTab === next);
+    const activeButton = dom.hubTabs.find((button) => button.dataset.hubTab === group);
     if (activeButton) {
       dom.hubPanelTitle.textContent = activeButton.dataset.title || activeButton.textContent.trim();
       dom.hubPanelDesc.textContent = activeButton.dataset.desc || '';
     }
-    if (dom.hubBody) {
-      dom.hubBody.scrollTop = 0;
-      if (section !== next) {
-        const target = dom.hubPanels.find((panel) => panel.dataset.hubPanel === section);
-        if (target) requestAnimationFrame(() => {
-          const top = target.getBoundingClientRect().top - dom.hubBody.getBoundingClientRect().top;
-          dom.hubBody.scrollTop += top;
-        });
-      }
-    }
+    if (dom.hubBody) dom.hubBody.scrollTop = 0;
+
     if (activeButton && window.matchMedia('(max-width: 860px)').matches) {
       const nav = activeButton.closest('.hub-nav');
       if (nav) {
@@ -4675,20 +4671,39 @@
         });
       }
     }
-    if (dom.hubFootNote) {
-      if (next === 'account') dom.hubFootNote.textContent = '登录状态与同步会自动更新';
-      else if (next === 'search') dom.hubFootNote.textContent = '网页搜索设置即时保存；AI 配置点击保存';
-      else dom.hubFootNote.textContent = '修改会即时保存';
-    }
-    if (dom.aiConfigSave) dom.aiConfigSave.hidden = next !== 'search' || !sync.user || !cryptoState.enabled;
 
-    if (next === 'account') {
+    const aiEligible = Boolean(sync.user) && cryptoState.enabled;
+    if (dom.hubFootNote) {
+      let note = HUB_FOOT_NOTES[activePanel] || '修改会即时保存';
+      if (activePanel === 'ai' && !aiEligible) {
+        note = sync.user ? '开启数据加密后可保存 AI 配置' : '登录后可配置 AI';
+      }
+      dom.hubFootNote.textContent = note;
+    }
+
+    const showAISave = activePanel === 'ai' && aiEligible;
+    if (dom.aiConfigSave) {
+      dom.aiConfigSave.hidden = !showAISave;
+      dom.aiConfigSave.classList.toggle('btn-primary', showAISave);
+    }
+    if (dom.hubDone) dom.hubDone.classList.toggle('btn-primary', !showAISave);
+
+    updateAIConfigGate();
+
+    if (activePanel === 'account') {
       updateAccountUI();
     } else {
       syncSettingsUI();
-      if (next === 'privacy' && globalThis.QingdhPrivacy) QingdhPrivacy.refreshSettings();
-      if (next === 'search' && globalThis.QingdhAI) QingdhAI.openUsage();
-      if (next === 'sync') renderSyncManager();
+      if (activePanel === 'privacy-space' && globalThis.QingdhPrivacy) QingdhPrivacy.refreshSettings();
+      if (activePanel === 'usage' && globalThis.QingdhAI) QingdhAI.openUsage();
+      if (activePanel === 'sync') renderSyncManager();
+      if (activePanel === 'ai' && aiEligible && globalThis.QingdhAI && QingdhAI.prepareConfig) {
+        QingdhAI.prepareConfig().catch((error) => {
+          if (!dom.aiConfigError) return;
+          dom.aiConfigError.textContent = (error && error.message) || '读取 AI 配置失败';
+          dom.aiConfigError.hidden = false;
+        });
+      }
     }
   }
 
@@ -4700,7 +4715,6 @@
 
   function openSettings() {
     openHub('appearance');
-    if (globalThis.QingdhPrivacy) QingdhPrivacy.refreshSettings();
   }
 
   function openAIConfig() {
@@ -5413,8 +5427,6 @@
     if (state.drawerOpen) closeDrawer({ restoreFocus: false });
     openAccountDialog();
   });
-  dom.accountSecurityOpen.addEventListener('click', () => setHubTab('privacy'));
-
   dom.brand.addEventListener('click', (event) => {
     if (isMobileLayout()) return;
     if (sidebarMode() !== 'collapsed') return;
@@ -5455,7 +5467,6 @@
     withOptionalModule('QingdhMemo', () => QingdhMemo.toggle());
   });
 
-  prepareHubPanels();
   if (dom.hubCategory) {
     dom.hubCategory.innerHTML = dom.hubTabs
       .map(
@@ -5477,16 +5488,35 @@
       setHubTab(button.dataset.hubTab);
     });
   });
-  dom.aiConfigOpen.addEventListener('click', () => {
-    if (globalThis.QingdhAI) QingdhAI.openConfig();
-  });
+  if (dom.hubSubnav) {
+    dom.hubSubnav.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-hub-subtab]');
+      if (button) setHubTab(button.dataset.hubSubtab);
+    });
+    dom.hubSubnav.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      const items = Array.from(dom.hubSubnav.querySelectorAll('[data-hub-subtab]'));
+      const index = items.indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const step = event.key === 'ArrowRight' ? 1 : -1;
+      const next = items[(index + step + items.length) % items.length];
+      next.focus();
+      next.click();
+    });
+  }
+  if (dom.aiConfigGateAction) {
+    dom.aiConfigGateAction.addEventListener('click', () => {
+      setHubTab(sync.user ? 'encryption' : 'account');
+    });
+  }
 
   dom.sidebarCollapse.addEventListener('click', toggleSidebar);
   dom.sidebarHide.addEventListener('click', () => setSidebarMode('hidden'));
   dom.sidebarReveal.addEventListener('click', () => setSidebarMode(restoreSidebarMode()));
   dom.sidebarOpen.addEventListener('click', openDrawer);
   dom.sidebarScrim.addEventListener('click', () => closeDrawer());
-  dom.syncBadge.addEventListener('click', () => openAccountDialog());
+  dom.syncBadge.addEventListener('click', () => openHub('sync'));
   dom.sidebar.addEventListener('mouseenter', () => {
     if (!prefs.sidebarAutoCollapse || isMobileLayout()) return;
     if (!state.hoverCollapsed) return;
@@ -5565,10 +5595,6 @@
     dom.engineNewUrl.value = '';
     dom.engineAddDialog.showModal();
     requestAnimationFrame(() => dom.engineNewName.focus());
-  });
-  dom.aiEngineConfigList.addEventListener('click', (event) => {
-    if (!event.target.closest('[data-ai-config-open]')) return;
-    if (globalThis.QingdhAI) QingdhAI.openConfig();
   });
   dom.engineConfigList.addEventListener('dragstart', (event) => {
     const row = event.target.closest('[data-engine-id]');
@@ -5783,7 +5809,6 @@
   dom.resetForm.addEventListener('submit', handleResetPassword);
   dom.deleteForm.addEventListener('submit', handleDeleteAccount);
 
-  dom.syncNowBtn.addEventListener('click', () => syncNow());
   if (dom.syncPageNow) dom.syncPageNow.addEventListener('click', () => syncNow());
   if (dom.syncAutoToggle) {
     dom.syncAutoToggle.addEventListener('change', () => {
@@ -5819,15 +5844,6 @@
     dom.deleteDialog.showModal();
     requestAnimationFrame(() => dom.deletePassword.focus());
   });
-  dom.exportCloudBtn.addEventListener('click', () => {
-    const anchor = document.createElement('a');
-    anchor.href = '/api/v1/account/export';
-    anchor.download = '';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-  });
-
   dom.sessionsBlock.addEventListener('toggle', () => {
     if (dom.sessionsBlock.open) loadSessions();
   });
@@ -6188,6 +6204,7 @@
     QingdhAI.init({
       toast: showToast,
       openAccountDialog,
+      openEncryptionSettings: () => openHub('encryption'),
       openAIConfig: () => openAIConfig(),
       isHubOpen: () => Boolean(dom.hubDialog && dom.hubDialog.open),
       focusSearch,
@@ -6250,6 +6267,7 @@
         if (globalThis.QingdhPrivacy) QingdhPrivacy.requestOpen();
       },
       openSettings,
+      openAIConfig,
       openAccount: openAccountDialog,
       toggleTheme: () => {
         prefs.theme = resolveTheme() === 'dark' ? 'light' : 'dark';

@@ -8,7 +8,7 @@
 'use strict';
 
 // 每次发布前端资源时递增版本号；新版本安装后等待用户确认再接管。
-const VERSION = '20261029-36';
+const VERSION = '20261029-37';
 const CACHE_NAME = `qingdh-shell-${VERSION}`;
 const SHELL_PATHS = [
   '/',
