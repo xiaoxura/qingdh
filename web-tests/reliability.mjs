@@ -365,12 +365,92 @@ async function main() {
   check('AI config loads while logged in', aiInfo.label === 'DeepSeek', aiInfo.label);
   check('logout clears AI config, key cache and panel', aiInfo.cached === null && aiInfo.active === '' && aiInfo.panel === true, ai.value);
 
+  // ---------- A4. disable encryption: dependency block, cleanup, broadcast ----------
+  const emailD = `disable-${Date.now()}@example.com`;
+  const setupD = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    document.getElementById('account-btn').click(); await sleep(250);
+    document.querySelector('[data-auth-view="register"]').click(); await sleep(80);
+    document.getElementById('register-email').value=${JSON.stringify(emailD)};
+    document.getElementById('register-password').value='correct horse battery';
+    document.getElementById('register-password2').value='correct horse battery';
+    document.getElementById('register-form').requestSubmit();
+    for(let i=0;i<80;i++){await sleep(100);if(!document.getElementById('account-user').hidden)break;}
+    for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('sync-badge').dataset.status==='synced')break;}
+    document.getElementById('encryption-enable').click(); await sleep(200);
+    document.getElementById('encrypt-password').value='disable-encryption-1';
+    document.getElementById('encrypt-password2').value='disable-encryption-1';
+    document.getElementById('encrypt-form').requestSubmit();
+    for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('recovery-dialog').open)break;}
+    document.getElementById('recovery-confirm').checked=true;
+    document.getElementById('recovery-confirm').dispatchEvent(new Event('change'));
+    document.getElementById('recovery-continue').click();
+    for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('encryption-state').textContent==='已开启')break;}
+    await sleep(500);
+    document.getElementById('hub-dialog').close();
+    const me=await (await fetch('/api/v1/auth/me')).json();
+    const keyB64=sessionStorage.getItem('qingdh.crypto.v1:'+me.user.id);
+    const key=QingdhCrypto.fromBase64(keyB64);
+    const memo=await QingdhCrypto.sealSecret('memo',key,{memos:[{id:'m1',title:'待导出',body:'x',updatedAt:Date.now()}]});
+    const saved=await fetch('/api/v1/secrets/memo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseRevision:0,payload:memo})});
+    return JSON.stringify({userId:me.user.id, state:document.getElementById('encryption-state').textContent, memoStatus:saved.status});})()`);
+  const setupDInfo = JSON.parse(setupD.value || '{}');
+  check('A4 account ready with encrypted memo', setupDInfo.state === '已开启' && setupDInfo.memoStatus === 200, setupD.value);
+
+  const tab3 = await connect(BASE + '/');
+  await sleep(3000);
+  const tab3Before = await tab3.evaluate(`JSON.stringify({enc:document.getElementById('encryption-state').textContent, unlock:document.getElementById('unlock-dialog').open})`);
+
+  const disabled = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    const userId=${JSON.stringify(setupDInfo.userId || '')};
+    const vaultBefore=await QingdhDeviceVault.status(userId);
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="privacy"]').click(); await sleep(200);
+    document.querySelector('[data-hub-subtab="encryption"]').click(); await sleep(200);
+    document.getElementById('encryption-disable').click(); await sleep(250);
+    const submit=async(password,discard)=>{document.getElementById('disable-encryption-password').value=password;
+      document.getElementById('disable-encryption-confirm').checked=true;
+      document.getElementById('disable-encryption-confirm').dispatchEvent(new Event('change'));
+      const box=document.getElementById('disable-encryption-discard');
+      if(box.checked!==discard){box.checked=discard;box.dispatchEvent(new Event('change'));}
+      document.getElementById('disable-encryption-form').requestSubmit();};
+    await submit('wrong-password',false); await sleep(500);
+    const wrongError=document.getElementById('disable-encryption-error').textContent;
+    const stateAfterWrong=document.getElementById('encryption-state').textContent;
+    await submit('correct horse battery',false); await sleep(700);
+    const dependencyShown=!document.getElementById('disable-encryption-dependency').hidden;
+    const dependencyMessage=document.getElementById('disable-encryption-dependency-message').textContent;
+    const stateAfterDependency=document.getElementById('encryption-state').textContent;
+    await submit('correct horse battery',true);
+    for(let i=0;i<100;i++){await sleep(100);if(document.getElementById('encryption-state').textContent==='未开启')break;}
+    await sleep(600);
+    const workspace=await (await fetch('/api/v1/workspace')).json();
+    const memoAfter=await (await fetch('/api/v1/secrets/memo')).json();
+    const vaultAfter=await QingdhDeviceVault.status(userId);
+    const cached=localStorage.getItem('qingdh.data.v1:user:'+userId)||'';
+    const cryptoKeys=Object.keys(sessionStorage).filter((key)=>key.startsWith('qingdh.crypto.v1:'));
+    document.getElementById('hub-dialog').close();
+    return JSON.stringify({wrongError, stateAfterWrong, dependencyShown, dependencyMessage, stateAfterDependency,
+      state:document.getElementById('encryption-state').textContent, version:workspace.payload && workspace.payload.version,
+      memoRevision:memoAfter.revision, vaultBefore:vaultBefore.remembered, vaultAfter:vaultAfter.remembered,
+      localHasGitHub:cached.includes('GitHub'), cryptoKeys, dialogClosed:!document.getElementById('disable-encryption-dialog').open});})()`);
+  const disabledInfo = JSON.parse(disabled.value || '{}');
+  check('A4 wrong password keeps encryption enabled', (disabledInfo.wrongError || '').includes('密码') && disabledInfo.stateAfterWrong === '已开启', disabled.value);
+  check('A4 data-key secrets block disabling with guidance', disabledInfo.dependencyShown === true && (disabledInfo.dependencyMessage || '').includes('AI 配置或备忘录') && disabledInfo.stateAfterDependency === '已开启', disabled.value);
+  check('A4 successful disable writes plaintext v2', disabledInfo.state === '未开启' && disabledInfo.version === 2 && disabledInfo.memoRevision === 0, disabled.value);
+  check('A4 disable clears vault and session data key but keeps local cache', disabledInfo.vaultBefore === true && disabledInfo.vaultAfter === false && (disabledInfo.cryptoKeys || []).length === 0 && disabledInfo.localHasGitHub === true && disabledInfo.dialogClosed === true, disabled.value);
+
+  await sleep(1800);
+  const tab3After = await tab3.evaluate(`JSON.stringify({enc:document.getElementById('encryption-state').textContent, unlock:document.getElementById('unlock-dialog').open})`);
+  const tab3BeforeInfo = JSON.parse(tab3Before.value || '{}');
+  const tab3AfterInfo = JSON.parse(tab3After.value || '{}');
+  check('A4 broadcast resets other tabs to plaintext', tab3BeforeInfo.enc === '已开启' && tab3AfterInfo.enc === '未开启' && tab3AfterInfo.unlock === false, `${tab3Before.value} -> ${tab3After.value}`);
+
   const png = await tab1.send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(join(tmpdir(), 'qingdh-regression-final.png'), Buffer.from(png.data, 'base64'));
   const failures = checks.filter((c) => !c.ok);
   console.log(`\n${checks.length - failures.length}/${checks.length} checks passed`);
   if (failures.length) process.exitCode = 1;
-  tab1.ws.close(); tab2.ws.close();
+  tab1.ws.close(); tab2.ws.close(); tab3.ws.close();
 }
 
 try { await main(); } finally { chrome.kill('SIGKILL'); }

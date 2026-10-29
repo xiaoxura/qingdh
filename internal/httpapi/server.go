@@ -145,6 +145,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/v1/workspace", s.requireAuth(s.handleGetWorkspace))
 	mux.HandleFunc("PUT /api/v1/workspace", s.requireAuth(s.handlePutWorkspace))
+	mux.HandleFunc("POST /api/v1/workspace/disable-encryption", s.requireAuth(s.handleDisableEncryption))
 
 	mux.HandleFunc("GET /api/v1/site", s.handleSiteInfo)
 	mux.HandleFunc("GET /api/favicon", s.handleFavicon)
@@ -153,6 +154,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/v1/secrets/{kind}", s.requireAuth(s.handleGetSecret))
 	mux.HandleFunc("PUT /api/v1/secrets/{kind}", s.requireAuth(s.handlePutSecret))
+	mux.HandleFunc("DELETE /api/v1/secrets/{kind}", s.requireAuth(s.handleDeleteSecret))
 
 	mux.HandleFunc("POST /api/v1/ai/chat", s.requireAuth(s.handleAIChat))
 	mux.HandleFunc("POST /api/v1/ai/test", s.requireAuth(s.handleAITest))

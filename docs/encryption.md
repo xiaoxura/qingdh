@@ -116,10 +116,13 @@ data             = AES-GCM(dataKey, JSON.stringify(payload v2))
 
 仍未做：
 
-- 关闭加密（回到明文）；
-- 重新生成恢复码；
-- 管理员访问审计日志；
+- 管理员访问审计日志（A6 本轮实施）；
 - 强制所有用户迁移到加密模式。
+
+已完成（2026-10-29）：
+
+- 重新生成恢复码（只替换 `recovery.wrappedKey`，旧码立即失效）；
+- 关闭加密（显式端点 + 登录密码二次确认，见第 13 节）。
 
 ## 7. Secret envelope v4（AI / 备忘录 / 隐私空间）
 
@@ -200,8 +203,14 @@ data             = AES-GCM(dataKey, JSON.stringify(payload v2))
 仍未做：
 
 - Passkey H2（服务端可信设备、远程撤销）；
-- 关闭主加密回到明文；
-- 重新生成恢复码；
-- 管理员访问审计日志；
+- 管理员访问审计日志（A6 本轮实施）；
 - 服务端全文搜索/多端实时同步；
 - 文件/图片附件与多人协作。
+
+## 13. 关闭加密（2026-10-29）
+
+- 入口：`POST /api/v1/workspace/disable-encryption`，请求体 `{ baseRevision, currentPassword, payload }`；`PUT /workspace` 仍然拒绝 v3 → v2 明文覆盖。
+- 服务端要求：登录会话、当前登录密码、当前文档为 v3、`baseRevision` 匹配、`payload` 为合法 v2；成功后 revision+1 并写审计 `account.encryption_disabled`。
+- 密钥依赖：`kind=ai/memo` 使用主 `dataKey` 派生的子密钥，存在时返回 `409 encryption_dependency` 并列出 kind；用户导出后可通过 `DELETE /api/v1/secrets/{kind}` 显式删除，再重试关闭。隐私空间用独立密码/密钥，不阻止关闭。
+- 客户端：二次确认并提示“历史版本、历史备份和已删除数据中的旧密文不会自动清理”；成功后清除本标签页 `sessionStorage` 的 dataKey、Device Vault 记录与 Passkey，重置 cryptoState，保留本地明文缓存，并用 `BroadcastChannel('qingdh')` 的 `encryption-disabled` 消息让其他标签页退回明文。
+- 边界：关闭后服务端、数据库与之后的备份都能读取导航文档；旧备份、旧 revision 与墓碑中的密文仍可能被恢复，需要用户自行处置。

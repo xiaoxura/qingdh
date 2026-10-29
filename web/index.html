@@ -925,6 +925,7 @@
                 <button class="btn btn-small" id="encryption-unlock" type="button" hidden>解锁</button>
                 <button class="btn btn-small" id="encryption-change" type="button" hidden>修改密码</button>
                 <button class="btn btn-small" id="encryption-recovery" type="button" hidden>重新生成恢复码</button>
+                <button class="btn btn-small btn-quiet-danger" id="encryption-disable" type="button" hidden>关闭加密</button>
               </div>
             </div>
             <p class="field-hint">加密密钥只保存在本机与云端密文中；忘记密码时需要使用开启加密时保存的恢复码。</p>
@@ -1205,6 +1206,48 @@
       <div class="dialog-foot">
         <button class="btn" id="unlock-later" type="button">稍后</button>
         <button class="btn btn-primary" id="unlock-submit" type="submit">解锁</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 关闭数据加密 -->
+  <dialog id="disable-encryption-dialog" aria-labelledby="disable-encryption-title">
+    <form id="disable-encryption-form" novalidate>
+      <div class="dialog-head">
+        <h2 id="disable-encryption-title">关闭数据加密</h2>
+        <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <p class="dialog-note">关闭后云端文档和之后的备份只保存明文，管理员、数据库和备份系统都能直接读取。</p>
+        <ul class="data-warnings">
+          <li>历史版本、历史备份和已删除数据中的旧密文不会自动清理。</li>
+          <li>AI 配置与备忘录使用主数据密钥派生的密钥；如果仍然存在，需要先导出或删除云端密文。</li>
+          <li>隐私空间使用独立密钥，不受影响；本机记住解锁与 Passkey 会被清除。</li>
+        </ul>
+        <div id="disable-encryption-dependency" hidden>
+          <p class="field-error" id="disable-encryption-dependency-message"></p>
+          <label class="checkbox-line">
+            <input type="checkbox" id="disable-encryption-discard" />
+            <span>我已导出或不再需要这些数据，允许删除云端密文</span>
+          </label>
+        </div>
+        <div class="field">
+          <label for="disable-encryption-password">当前登录密码</label>
+          <input id="disable-encryption-password" type="password" autocomplete="current-password" />
+        </div>
+        <label class="checkbox-line">
+          <input type="checkbox" id="disable-encryption-confirm" />
+          <span>我已了解关闭后云端与备份不再加密</span>
+        </label>
+        <p class="field-error" id="disable-encryption-error" hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn" type="button" data-close-dialog>取消</button>
+        <button class="btn btn-danger" id="disable-encryption-submit" type="submit">关闭加密</button>
       </div>
     </form>
   </dialog>

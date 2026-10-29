@@ -137,24 +137,22 @@ ALTER TABLE email_tokens ADD CONSTRAINT email_tokens_kind_check
 - 新恢复码可解锁、旧恢复码失败、密码解锁不受影响、`data` 解密结果不变。
 - 新增 `web-tests/unit/crypto.test.mjs`，覆盖上述用例以及错误密码、篡改密文、AAD/kind 混淆。
 
-### A4 关闭加密（决策点，建议本轮只留设计）
+### A4 关闭加密（本轮已实施）
 
 **问题**：用户开启加密后无法回到明文。直接放宽 `PUT /workspace` 会破坏现有的降级防护（当前 v3 → v2 会返回 `422 encryption_required`，见 `internal/httpapi/workspace_handlers.go`）。
 
-**建议**：本轮**不实现**关闭加密，只完成 A3（重新生成恢复码）。理由：
-
-- 关闭加密需要新的安全语义：谁有权降级、如何确认、历史备份中的密文是否仍算泄露；
-- 任何 XSS 都能触发降级，和“读取数据”同级，需要单独的威胁模型说明；
-- 恢复码重生成已经覆盖“丢失第二条找回路径”的主要痛点。
-
-**若决定本轮实现**，采用显式端点而不是放宽 PUT：
+**实现**：采用显式端点，不放宽 `PUT` 的 v3→v2 降级防护。
 
 ```text
 POST /api/v1/workspace/disable-encryption
-{ "baseRevision": 12, "payload": { ...v2 明文... } }
+{ "baseRevision": 12, "currentPassword": "...", "payload": { ...v2 明文... } }
 ```
 
-服务端校验 `baseRevision`、明文 v2 结构、当前文档确为 v3；写入后 revision+1，并写审计 `account.encryption_disabled`。前端必须二次确认，并提示“历史备份和已删除数据中的密文不会被清理”。该端点仍受同源 + JSON + 登录会话约束。
+- 服务端：登录会话 + 当前登录密码二次确认；当前文档必须是 v3；`baseRevision` 必须匹配；`payload` 必须是合法 v2；写入 revision+1；写审计 `account.encryption_disabled`；按用户限流（5 次/分钟，burst 3）。
+- 错误约定：未加密 `422 not_encrypted`；密码错误 `403 invalid_password`；revision 冲突 `409 revision_conflict`；存在密钥依赖 `409 encryption_dependency`。
+- **密钥依赖**：`kind=ai` / `kind=memo` 的 secret 使用主 `dataKey` 派生密钥，关闭后 `dataKey` 不再可用。存在这类 secret 时阻止关闭，并在响应里返回 `secrets` 列表，提示先导出/删除；新增 `DELETE /api/v1/secrets/{kind}` 作为显式删除入口。隐私空间使用独立密钥，可以保留。
+- 客户端：二次确认，并明确提示「历史版本、历史备份和已删除数据中的旧密文不会自动清理」。成功后清空 `sessionStorage` 中的 `dataKey`、删除该账号的 Device Vault 记录与 Passkey、重置 `cryptoState`、保留本地明文缓存，并通过 `BroadcastChannel('qingdh')` 的 `encryption-disabled` 消息通知其他标签页；失败时保持加密状态。
+- 语义边界：XSS 能触发关闭加密，和读取数据同级；因此仍要求登录密码，提示中说明历史密文不会清理。
 
 ### A5 服务端版本历史
 
@@ -341,14 +339,14 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 - **会话语义**：改密默认保留当前会话、撤销其他会话；邮箱确认如果发生在没有该账号会话的设备上，则撤销全部会话（需重新登录）。这是本轮明确的产品决定，需写入 UI 文案。
 - **历史回填**：`document_revisions` 只记录上线后的 PUT，不回填旧版本；当前文档读取与同步不受影响。
 - **历史成本**：`document_revisions` 会放大写入量与数据库体积；保留策略必须先于功能上线，且要压测 20 份 × 512 KiB 的写放大。
-- **关闭加密**：本轮默认不实现，避免打开降级面；若实施，必须单独评审威胁模型。
+- **关闭加密**：本轮通过显式端点实施（密码二次确认 + 审计 + 密钥依赖拦截），`PUT /workspace` 的降级防护保持不变；历史版本/备份中的旧密文不会自动清理。
 - **审计 PII**：`actor_email` 是账号标识快照，仅管理员可见，随 `audit_log` 一起按 365 天保留。
 - **拆分风险**：`app.js` 拆分期间功能开关、懒加载 wiring、Service Worker 预缓存列表必须同步更新；每一步跑完现有回归再继续。
 - **首屏目标**：C4 的目标是工程指标，不引入新的性能预算工具；以 gzip 体积和 DevTools 记录为准。
 
 ## 9. 开放问题
 
-1. A4 关闭加密是否纳入本阶段？建议不纳入，先交付 A3。
+1. A4 关闭加密已纳入本阶段实施；后续若调整威胁模型，需同步更新本文与 `docs/encryption.md`。
 2. A5 历史保留 20 份 / 30 天是否合适？若单用户文档长期接近 512 KiB，需要下调到 10 份或改为每日快照。
 3. 改密后是否保留当前会话？建议保留；若希望“全部设备重新登录”，改为撤销全部会话并跳转登录。
 4. A5 是否扩展到 memo secret 历史？建议下一轮再评估，本轮只做普通工作区。
@@ -387,7 +385,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | A1 登录密码修改 | 已完成 | `TestChangePasswordValidation`/`KeepsCurrentSessionAndRevokesOthers`/`RateLimitedPerUser`（403/422/429、保留当前会话、其他设备 401、审计与邮件） | 新增 `POST /auth/password`、`UpdatePasswordAndRevokeOtherSessions`、账号页对话框 |
 | A2 邮箱修改 | 已完成 | 迁移 0009；`TestEmailChange*`（占用、密码、SMTP、确认页不消费 token、过期/重复/覆盖、保留当前会话或全部撤销、旧邮箱通知、审计）；`reliability.mjs` 覆盖 SMTP 未配置时入口禁用 | 新增 `/auth/email-change`、`/change-email`；`users.pending_email` |
 | A3 恢复码重新生成 | 已完成 | `web-tests/unit/crypto.test.mjs`（新码可解锁、旧码失败、密码与 data 不变、AAD/kind/篡改）；`reliability.mjs` 端到端重生成 | 新增 `crypto.rewrapRecovery` 与「重新生成恢复码」对话框 |
-| A4 关闭加密 | 待开始 | | 本轮实施（以任务提示词为准） |
+| A4 关闭加密 | 已完成 | `TestDisableEncryption*`（未登录/未加密/密码错/409/依赖/成功 v2+审计）；`reliability.mjs`（失败保持加密、vault/sessionStorage 清理、明文保留、跨标签页通知） | 显式端点 + `DELETE /secrets/{kind}`；PUT 降级防护未放宽 |
 | A5 服务端版本历史 | 待开始 | | |
 | A6 审计日志后台 | 待开始 | | |
 | A7 发布收口 | 待开始 | | 仅本地版本号、构建与文档；不推送 |

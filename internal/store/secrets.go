@@ -37,6 +37,34 @@ func (s *Store) GetSecret(ctx context.Context, userID uuid.UUID, kind string) (S
 	return secret, nil
 }
 
+// SecretKinds returns the kinds of secret rows owned by the user. Used to
+// block disabling the main encryption while data-key secrets still exist.
+func (s *Store) SecretKinds(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT kind FROM user_secrets WHERE user_id = $1 ORDER BY kind`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var kinds []string
+	for rows.Next() {
+		var kind string
+		if err := rows.Scan(&kind); err != nil {
+			return nil, err
+		}
+		kinds = append(kinds, kind)
+	}
+	return kinds, rows.Err()
+}
+
+// DeleteSecret removes one encrypted blob. Callers treat a missing row as
+// success: the desired end state is "no data".
+func (s *Store) DeleteSecret(ctx context.Context, userID uuid.UUID, kind string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM user_secrets WHERE user_id = $1 AND kind = $2`, userID, kind)
+	return err
+}
+
 // PutSecret writes payload when the stored revision still equals baseRevision.
 // Creating the row requires baseRevision 0. It returns ErrConflict otherwise.
 func (s *Store) PutSecret(ctx context.Context, userID uuid.UUID, kind string, baseRevision int64, payload []byte) (Secret, error) {

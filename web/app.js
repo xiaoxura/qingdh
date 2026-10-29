@@ -352,6 +352,16 @@
     encryptionUnlock: $('#encryption-unlock'),
     encryptionChange: $('#encryption-change'),
     encryptionRecovery: $('#encryption-recovery'),
+    encryptionDisable: $('#encryption-disable'),
+    disableEncryptionDialog: $('#disable-encryption-dialog'),
+    disableEncryptionForm: $('#disable-encryption-form'),
+    disableEncryptionDependency: $('#disable-encryption-dependency'),
+    disableEncryptionDependencyMessage: $('#disable-encryption-dependency-message'),
+    disableEncryptionDiscard: $('#disable-encryption-discard'),
+    disableEncryptionPassword: $('#disable-encryption-password'),
+    disableEncryptionConfirm: $('#disable-encryption-confirm'),
+    disableEncryptionError: $('#disable-encryption-error'),
+    disableEncryptionSubmit: $('#disable-encryption-submit'),
     encryptDialog: $('#encrypt-dialog'),
     encryptForm: $('#encrypt-form'),
     encryptPassword: $('#encrypt-password'),
@@ -499,6 +509,7 @@
     drawerOpen: false,
     drawerReturnFocus: null,
     hoverCollapsed: false,
+    disableBlockingSecrets: [],
   };
 
   const cryptoState = {
@@ -2412,6 +2423,7 @@
     dom.encryptionUnlock.hidden = !(enabled && !cryptoState.unlocked);
     dom.encryptionChange.hidden = !(enabled && cryptoState.envelope);
     dom.encryptionRecovery.hidden = !(enabled && cryptoState.envelope);
+    dom.encryptionDisable.hidden = !enabled;
 
     if (!enabled) {
       dom.encryptionHint.textContent = '开启后云端只保存密文，管理员也需要密码才能查看。';
@@ -2950,6 +2962,137 @@
       dom.decryptFileError.textContent = useRecovery ? '恢复码不正确' : '加密密码不正确';
       dom.decryptFileError.hidden = false;
       dom.decryptFileSubmit.disabled = false;
+    }
+  }
+
+  function openDisableEncryptionDialog() {
+    if (!sync.user || !cryptoState.enabled) return;
+    state.disableBlockingSecrets = [];
+    dom.disableEncryptionForm.reset();
+    dom.disableEncryptionDependency.hidden = true;
+    dom.disableEncryptionDependencyMessage.textContent = '';
+    dom.disableEncryptionDiscard.checked = false;
+    dom.disableEncryptionError.hidden = true;
+    dom.disableEncryptionSubmit.disabled = false;
+    dom.disableEncryptionDialog.showModal();
+    requestAnimationFrame(() => dom.disableEncryptionPassword.focus());
+  }
+
+  async function finishDisableEncryption(revision) {
+    const userId = sync.user ? sync.user.id : null;
+    // 先清除本机 vault，再重置内存/会话中的密钥。
+    if (userId && globalThis.QingdhDeviceVault) {
+      try {
+        await QingdhDeviceVault.forget(userId);
+      } catch (error) {
+        // IndexedDB 不可用时仍然继续清理内存状态。
+      }
+    }
+    if (userId && globalThis.QingdhPasskey) {
+      QingdhPasskey.remove(userId).catch(() => {});
+    }
+    resetCryptoState();
+    sync.revision = revision;
+    sync.dirty = false;
+    sync.hasLocal = true;
+    sync.lastSyncedAt = now();
+    sync.cloudData = syncScopedData();
+    writeSyncMeta();
+    writeGuestDirty(false);
+    persist();
+    updateSyncUI();
+    setStatus('synced');
+    if (channel) {
+      try {
+        channel.postMessage({ type: 'encryption-disabled', userId });
+      } catch (error) {
+        // ignore
+      }
+    }
+    dom.disableEncryptionDialog.close();
+    showToast('已关闭数据加密；历史版本与备份中的旧密文不会自动清理');
+  }
+
+  async function submitDisableEncryption(event) {
+    event.preventDefault();
+    dom.disableEncryptionError.hidden = true;
+    const password = dom.disableEncryptionPassword.value;
+    if (!password) {
+      dom.disableEncryptionError.textContent = '请输入当前登录密码';
+      dom.disableEncryptionError.hidden = false;
+      return;
+    }
+    if (!dom.disableEncryptionConfirm.checked) {
+      dom.disableEncryptionError.textContent = '请先勾选“我已了解关闭后云端与备份不再加密”';
+      dom.disableEncryptionError.hidden = false;
+      return;
+    }
+    if (state.disableBlockingSecrets.length && !dom.disableEncryptionDiscard.checked) {
+      dom.disableEncryptionError.textContent = '请先导出或删除 AI 配置/备忘录，并勾选允许删除云端密文';
+      dom.disableEncryptionError.hidden = false;
+      return;
+    }
+    if (sync.revision == null) {
+      dom.disableEncryptionError.textContent = '请先完成一次云端同步';
+      dom.disableEncryptionError.hidden = false;
+      return;
+    }
+
+    dom.disableEncryptionSubmit.disabled = true;
+    try {
+      // 依赖清理是用户显式勾选后的动作；删除后立即重试关闭。
+      if (state.disableBlockingSecrets.length) {
+        for (const kind of state.disableBlockingSecrets) {
+          const removed = await api('/api/v1/secrets/' + encodeURIComponent(kind), { method: 'DELETE' });
+          if (!removed.ok) {
+            throw new Error(apiError(removed, '删除云端密文失败'));
+          }
+        }
+        state.disableBlockingSecrets = [];
+        dom.disableEncryptionDependency.hidden = true;
+      }
+
+      const response = await api('/api/v1/workspace/disable-encryption', {
+        method: 'POST',
+        body: { baseRevision: sync.revision, currentPassword: password, payload: syncScopedData() },
+      });
+      if (response.status === 401) {
+        dom.disableEncryptionDialog.close();
+        await handleAuthLost();
+        return;
+      }
+      if (response.status === 409) {
+        const code = response.data && response.data.error && response.data.error.code;
+        if (code === 'encryption_dependency') {
+          const secrets = (response.data && response.data.secrets) || [];
+          state.disableBlockingSecrets = secrets;
+          dom.disableEncryptionDependency.hidden = false;
+          dom.disableEncryptionDependencyMessage.textContent = apiError(
+            response,
+            'AI 配置或备忘录仍使用主数据密钥，需要先导出或删除'
+          );
+          dom.disableEncryptionDiscard.checked = false;
+          return;
+        }
+        throw new Error('云端已在其他地方更新，请先同步后重试');
+      }
+      if (!response.ok) {
+        const code = response.data && response.data.error && response.data.error.code;
+        throw new Error(
+          code === 'invalid_password'
+            ? '登录密码不正确'
+            : code === 'not_encrypted'
+              ? '云端数据已经未加密'
+              : apiError(response, '关闭加密失败')
+        );
+      }
+
+      await finishDisableEncryption(response.data.revision);
+    } catch (error) {
+      dom.disableEncryptionError.textContent = (error && error.message) || '关闭加密失败';
+      dom.disableEncryptionError.hidden = false;
+    } finally {
+      dom.disableEncryptionSubmit.disabled = false;
     }
   }
 
@@ -5976,6 +6119,11 @@
   dom.encryptionUnlock.addEventListener('click', unlockFromPanel);
   dom.encryptionChange.addEventListener('click', openChangeEncryptionDialog);
   dom.encryptionRecovery.addEventListener('click', openRotateRecoveryDialog);
+  dom.encryptionDisable.addEventListener('click', openDisableEncryptionDialog);
+  dom.disableEncryptionForm.addEventListener('submit', submitDisableEncryption);
+  dom.disableEncryptionDiscard.addEventListener('change', () => {
+    if (dom.disableEncryptionDiscard.checked) dom.disableEncryptionError.hidden = true;
+  });
   dom.rotateRecoveryForm.addEventListener('submit', submitRotateRecovery);
   dom.newRecoverySave.addEventListener('click', finishRotateRecovery);
   dom.newRecoveryCopy.addEventListener('click', copyNewRecoveryCode);
@@ -6332,10 +6480,18 @@
     channel = new BroadcastChannel(BROADCAST_CHANNEL);
     channel.addEventListener('message', (event) => {
       const message = event.data || {};
+      const currentUser = sync.user ? sync.user.id : null;
+
+      // 其他标签页关闭了加密：立即清掉本页密钥并拉取明文文档。
+      if (message.type === 'encryption-disabled') {
+        if (message.userId !== currentUser) return;
+        resetCryptoState();
+        syncNow({ manual: true });
+        return;
+      }
+
       if (message.type !== 'data-changed') return;
       if (applyingRemote) return;
-
-      const currentUser = sync.user ? sync.user.id : null;
       if (message.userId !== currentUser) return;
 
       const stored = readJSON(currentKey());

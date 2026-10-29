@@ -117,6 +117,33 @@ func (s *Server) handlePutSecret(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleDeleteSecret discards one synced secret. It is used when a user wants
+// to stop using AI configuration or memos before disabling main encryption.
+func (s *Server) handleDeleteSecret(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFrom(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "请先登录")
+		return
+	}
+
+	kind := r.PathValue("kind")
+	if !docval.SecretKindAllowed(kind) {
+		writeError(w, http.StatusNotFound, "not_found", "不支持的 secret 类型")
+		return
+	}
+	if !s.limiter.allow("secret:"+user.ID.String(), limitSecretPerUser, burstSecretPerUser) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "操作太频繁，请稍后再试")
+		return
+	}
+
+	if err := s.store.DeleteSecret(r.Context(), user.ID, kind); err != nil {
+		s.logger.Error("delete secret", "error", err, "user_id", user.ID.String(), "kind", kind)
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "deleted"})
+}
+
 // writeSecretConflict returns 409 together with the current ciphertext so the
 // client can re-merge without another round trip.
 func (s *Server) writeSecretConflict(w http.ResponseWriter, r *http.Request, userID uuid.UUID, kind string) {
