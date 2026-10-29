@@ -15,9 +15,13 @@ type userDTO struct {
 	ID            string    `json:"id"`
 	Email         string    `json:"email"`
 	EmailVerified bool      `json:"emailVerified"`
+	PendingEmail  string    `json:"pendingEmail,omitempty"`
 	IsAdmin       bool      `json:"isAdmin"`
 	Disabled      bool      `json:"disabled"`
 	CreatedAt     time.Time `json:"createdAt"`
+
+	// EmailChangeAvailable 是运行期能力，不是账号属性；前端据此禁用入口。
+	EmailChangeAvailable bool `json:"emailChangeAvailable"`
 }
 
 type adminUserDTO struct {
@@ -39,7 +43,7 @@ func toAdminUserDTO(u store.AdminUser) adminUserDTO {
 }
 
 func toUserDTO(u store.User) userDTO {
-	return userDTO{
+	dto := userDTO{
 		ID:            u.ID.String(),
 		Email:         u.Email,
 		EmailVerified: u.Verified(),
@@ -47,6 +51,17 @@ func toUserDTO(u store.User) userDTO {
 		Disabled:      u.DisabledAt != nil,
 		CreatedAt:     u.CreatedAt,
 	}
+	if u.PendingEmail != nil {
+		dto.PendingEmail = *u.PendingEmail
+	}
+	return dto
+}
+
+// authUserDTO adds runtime capabilities for the signed-in account UI.
+func (s *Server) authUserDTO(u store.User) userDTO {
+	dto := toUserDTO(u)
+	dto.EmailChangeAvailable = s.settings.Get().SMTPConfigured()
+	return dto
 }
 
 type sessionDTO struct {

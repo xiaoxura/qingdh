@@ -74,6 +74,12 @@ async function main() {
   const hub = await tab1.evaluate(`JSON.stringify((()=>{const d=document.getElementById('hub-dialog');const active=document.querySelector('[data-hub-tab].is-active');return {open:d.open,tab:active&&active.dataset.hubTab,title:document.getElementById('hub-panel-title').textContent};})())`);
   const hubInfo = JSON.parse(hub.value || '{}');
   check('account and settings share one centered hub', hubInfo.open === true && hubInfo.tab === 'account', hub.value);
+
+  // A2：本地实例未配置 SMTP 时，改邮箱入口必须禁用并说明原因。
+  const emailEntry = await tab1.evaluate(`JSON.stringify((()=>{const btn=document.getElementById('change-email');return {disabled:btn.disabled, title:btn.title, hintHidden:document.getElementById('email-change-hint').hidden};})())`);
+  const emailEntryInfo = JSON.parse(emailEntry.value || '{}');
+  check('email change entry is disabled without SMTP', emailEntryInfo.disabled === true && emailEntryInfo.hintHidden === false, emailEntry.value);
+
   await tab1.evaluate(`document.getElementById('hub-dialog').close(); true`);
 
   // B2：自定义搜索引擎必须能从菜单里被选中并生效。

@@ -118,7 +118,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	sess := toSessionDTO(started.Session)
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"user":    toUserDTO(user),
+		"user":    s.authUserDTO(user),
 		"session": sess,
 	})
 }
@@ -198,7 +198,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, s.sessions.Cookie(started.Token, started.Session.ExpiresAt, s.requestSecure(r)))
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":    toUserDTO(user),
+		"user":    s.authUserDTO(user),
 		"session": toSessionDTO(started.Session),
 	})
 }
@@ -225,7 +225,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	sess, _ := sessionFrom(r.Context())
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":    toUserDTO(user),
+		"user":    s.authUserDTO(user),
 		"session": toSessionDTO(sess),
 	})
 }
@@ -357,7 +357,7 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, s.sessions.Cookie(started.Token, started.Session.ExpiresAt, s.requestSecure(r)))
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":    toUserDTO(user),
+		"user":    s.authUserDTO(user),
 		"session": toSessionDTO(started.Session),
 	})
 }

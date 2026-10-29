@@ -5,6 +5,7 @@ package mail
 import (
 	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -146,6 +147,11 @@ func VerificationLink(base *url.URL, token string) string {
 	return base.String() + "/verify-email?token=" + url.QueryEscape(token)
 }
 
+// ChangeEmailLink builds the URL that confirms a new address.
+func ChangeEmailLink(base *url.URL, token string) string {
+	return base.String() + "/change-email?token=" + url.QueryEscape(token)
+}
+
 // ResetLink builds the URL that opens the password reset screen.
 func ResetLink(base *url.URL, token string) string {
 	return base.String() + "/?reset_token=" + url.QueryEscape(token)
@@ -208,6 +214,42 @@ func PasswordChangeNoticeMessage(to string) Message {
 <p style="color:#6b7280;font-size:13px">如果这不是你本人的操作，请立即使用「忘记密码」重置账号密码。</p>
 </div>`
 	return Message{To: to, Subject: "氢导航登录密码已修改", Text: text, HTML: html}
+}
+
+// ChangeEmailMessage is sent to the new address before it becomes the account
+// email. Clicking the link is what proves ownership.
+func ChangeEmailMessage(base *url.URL, to, token string) Message {
+	link := ChangeEmailLink(base, token)
+	text := strings.Join([]string{
+		"你好，",
+		"",
+		"我们收到了把氢导航账号改到这个邮箱的请求。打开下面的链接确认修改：",
+		link,
+		"",
+		"链接 24 小时内有效，只能使用一次。",
+		"如果这不是你本人的操作，忽略这封邮件即可，原邮箱不会改变。",
+	}, "\n")
+
+	html := fmt.Sprintf(`<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;font-size:15px;line-height:1.7;color:#1b1e24;max-width:520px">
+<p>你好，</p>
+<p>我们收到了把<b>氢导航</b>账号改到这个邮箱的请求。点击下面的按钮确认修改：</p>
+<p style="margin:22px 0"><a href="%s" style="display:inline-block;background:#4f6bf5;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px">确认新邮箱</a></p>
+<p style="color:#6b7280;font-size:13px">按钮无法点击时，复制这个地址到浏览器打开：<br><span style="word-break:break-all">%s</span></p>
+<p style="color:#6b7280;font-size:13px">链接 24 小时内有效，只能使用一次。如果这不是你本人的操作，忽略这封邮件即可，原邮箱不会改变。</p>
+</div>`, link, link)
+
+	return Message{To: to, Subject: "确认你的氢导航新邮箱", Text: text, HTML: html}
+}
+
+// EmailChangedNoticeMessage tells the previous address that the account moved.
+func EmailChangedNoticeMessage(to, newEmail string) Message {
+	text := "你的氢导航账号邮箱已修改为 " + newEmail + "，其他设备已退出登录。\n\n如果这不是你本人的操作，请立即使用「忘记密码」重置账号密码。"
+	escaped := html.EscapeString(newEmail)
+	htmlBody := `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;font-size:15px;line-height:1.7;color:#1b1e24;max-width:520px">
+<p>你的氢导航账号邮箱已修改为 <b>` + escaped + `</b>，其他设备已退出登录。</p>
+<p style="color:#6b7280;font-size:13px">如果这不是你本人的操作，请立即使用「忘记密码」重置账号密码。</p>
+</div>`
+	return Message{To: to, Subject: "氢导航账号邮箱已修改", Text: text, HTML: htmlBody}
 }
 
 // PasswordChangedMessage notifies the account owner after a reset.

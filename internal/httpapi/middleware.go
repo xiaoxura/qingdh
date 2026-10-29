@@ -374,8 +374,8 @@ func (s *Server) mailBaseURL(r *http.Request) (*url.URL, error) {
 // requireJSON enforces a JSON body on state-changing requests that carry one.
 func (s *Server) requireJSON(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The email verification page submits a normal HTML form, not JSON.
-		if r.Method == http.MethodPost && r.URL.Path == "/verify-email" {
+		// The email verification / change-email pages submit normal HTML forms.
+		if r.Method == http.MethodPost && (r.URL.Path == "/verify-email" || r.URL.Path == "/change-email") {
 			next.ServeHTTP(w, r)
 			return
 		}

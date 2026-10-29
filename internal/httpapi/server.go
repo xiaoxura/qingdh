@@ -125,6 +125,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/auth/me", s.requireAuth(s.handleMe))
 	mux.HandleFunc("POST /api/v1/auth/refresh", s.requireAuth(s.handleRefresh))
 	mux.HandleFunc("POST /api/v1/auth/password", s.requireAuth(s.handleChangePassword))
+	mux.HandleFunc("POST /api/v1/auth/email-change", s.requireAuth(s.handleRequestEmailChange))
+	mux.HandleFunc("GET /change-email", s.handleChangeEmailPage)
+	mux.HandleFunc("POST /change-email", s.handleChangeEmailForm)
 
 	mux.HandleFunc("POST /api/v1/auth/verify-email", s.handleVerifyEmail)
 	mux.HandleFunc("GET /verify-email", s.handleVerifyEmailPage)

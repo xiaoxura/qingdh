@@ -23,6 +23,8 @@ var (
 	ErrEmailTaken    = errors.New("store: email already registered")
 	ErrTokenInvalid  = errors.New("store: token invalid, used or expired")
 	ErrSessionAbsent = errors.New("store: session not found")
+	// ErrPendingEmailChanged 表示待验证邮箱已被新请求覆盖或清空。
+	ErrPendingEmailChanged = errors.New("store: pending email changed")
 )
 
 // Store wraps a PostgreSQL connection pool.

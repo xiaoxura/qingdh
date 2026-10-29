@@ -15,6 +15,7 @@ type User struct {
 	Email           string
 	PasswordHash    string
 	EmailVerifiedAt *time.Time
+	PendingEmail    *string
 	IsAdmin         bool
 	DisabledAt      *time.Time
 	CreatedAt       time.Time
@@ -24,7 +25,7 @@ type User struct {
 // Verified reports whether the account completed email verification.
 func (u User) Verified() bool { return u.EmailVerifiedAt != nil }
 
-const userColumns = `id, email, password_hash, email_verified_at, is_admin, disabled_at, created_at, updated_at`
+const userColumns = `id, email, password_hash, email_verified_at, pending_email, is_admin, disabled_at, created_at, updated_at`
 
 // CreateUser inserts a user together with the empty navigation document in a
 // single transaction. It returns ErrEmailTaken when the address is in use.
@@ -73,7 +74,7 @@ func (s *Store) scanUserRow(ctx context.Context, query string, args ...any) (Use
 
 func scanUser(row pgx.Row, user *User) error {
 	return row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerifiedAt,
-		&user.IsAdmin, &user.DisabledAt, &user.CreatedAt, &user.UpdatedAt)
+		&user.PendingEmail, &user.IsAdmin, &user.DisabledAt, &user.CreatedAt, &user.UpdatedAt)
 }
 
 // MarkEmailVerified stamps users.email_verified_at once.
@@ -83,6 +84,78 @@ func (s *Store) MarkEmailVerified(ctx context.Context, id uuid.UUID, at time.Tim
 		SET email_verified_at = COALESCE(email_verified_at, $2), updated_at = now()
 		WHERE id = $1
 		RETURNING `+userColumns, id, at)
+}
+
+// SetPendingEmail stores the address awaiting confirmation. It is cleared by
+// ConfirmEmailChange or replaced by the next change request.
+func (s *Store) SetPendingEmail(ctx context.Context, id uuid.UUID, email string) (User, error) {
+	return s.scanUserRow(ctx, `
+		UPDATE users SET pending_email = $2, updated_at = now()
+		WHERE id = $1
+		RETURNING `+userColumns, id, email)
+}
+
+// ConfirmEmailChange consumes a change_email token and swaps the address in a
+// single transaction. It returns the updated user and the previous address so
+// the caller can notify the old mailbox. keepSessionID is the session of the
+// confirming browser and survives; every other session of the account is
+// revoked. When the request has no session, all sessions are revoked.
+func (s *Store) ConfirmEmailChange(ctx context.Context, tokenHash []byte, keepSessionID uuid.UUID) (User, string, error) {
+	var user User
+	var oldEmail string
+
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		var userID uuid.UUID
+		err := tx.QueryRow(ctx, `
+			UPDATE email_tokens
+			SET used_at = now()
+			WHERE token_hash = $1 AND kind = $2 AND used_at IS NULL AND expires_at > now()
+			RETURNING user_id`, tokenHash, TokenChangeEmail).Scan(&userID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTokenInvalid
+		}
+		if err != nil {
+			return err
+		}
+
+		var pending *string
+		if err := tx.QueryRow(ctx, `
+			SELECT email, pending_email FROM users WHERE id = $1 FOR UPDATE`, userID).
+			Scan(&oldEmail, &pending); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if pending == nil || *pending == "" {
+			return ErrPendingEmailChanged
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE users
+			SET email = $2, email_verified_at = now(), pending_email = NULL, updated_at = now()
+			WHERE id = $1`, userID, *pending); err != nil {
+			if isUniqueViolation(err, "users_email_key") {
+				return ErrEmailTaken
+			}
+			return err
+		}
+
+		if keepSessionID == uuid.Nil {
+			_, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
+		} else {
+			_, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND id <> $2`, userID, keepSessionID)
+		}
+		if err != nil {
+			return err
+		}
+
+		return scanUser(tx.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, userID), &user)
+	})
+	if err != nil {
+		return User{}, "", err
+	}
+	return user, oldEmail, nil
 }
 
 // UpdatePassword replaces the password hash and bumps updated_at.

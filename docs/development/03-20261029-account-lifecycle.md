@@ -385,7 +385,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | B8 workspace 缺失行自愈 | 已完成 | `TestWorkspaceRecoversMissingRow`（删行后 PUT 重建 revision 1；非 0 base 仍 409） | `UpdateDocument` 对齐 `PutSecret` |
 | B9 安全默认 | 已完成 | `TestEmailSendingRequiresTrustedSiteURL`、`TestPasswordHashingRejectsWhenSaturated`、`TestFaviconPortPolicyOnlyAllowsWebDefaults`/LRU 测试 | 邮件链接要求站点地址或 trusted_hosts；Argon2 全局 4 槽，超限 503；favicon 仅 80/443 + LRU |
 | A1 登录密码修改 | 已完成 | `TestChangePasswordValidation`/`KeepsCurrentSessionAndRevokesOthers`/`RateLimitedPerUser`（403/422/429、保留当前会话、其他设备 401、审计与邮件） | 新增 `POST /auth/password`、`UpdatePasswordAndRevokeOtherSessions`、账号页对话框 |
-| A2 邮箱修改 | 待开始 | | |
+| A2 邮箱修改 | 已完成 | 迁移 0009；`TestEmailChange*`（占用、密码、SMTP、确认页不消费 token、过期/重复/覆盖、保留当前会话或全部撤销、旧邮箱通知、审计）；`reliability.mjs` 覆盖 SMTP 未配置时入口禁用 | 新增 `/auth/email-change`、`/change-email`；`users.pending_email` |
 | A3 恢复码重新生成 | 待开始 | | |
 | A4 关闭加密 | 待开始 | | 本轮实施（以任务提示词为准） |
 | A5 服务端版本历史 | 待开始 | | |

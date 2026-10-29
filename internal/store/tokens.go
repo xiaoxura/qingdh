@@ -13,6 +13,7 @@ import (
 const (
 	TokenVerifyEmail   = "verify_email"
 	TokenResetPassword = "reset_password"
+	TokenChangeEmail   = "change_email"
 )
 
 // CreateEmailToken stores a hashed single-use token, invalidating older

@@ -72,7 +72,7 @@ func (s *Store) SessionByTokenHash(ctx context.Context, tokenHash []byte) (Sessi
 	row := s.pool.QueryRow(ctx, `
 		SELECT s.id, s.user_id, s.device_id, s.token_hash, s.user_agent, s.ip, s.created_at,
 		       s.last_seen_at, s.last_renewed_at, s.expires_at,
-		       u.id, u.email, u.password_hash, u.email_verified_at,
+		       u.id, u.email, u.password_hash, u.email_verified_at, u.pending_email,
 		       u.is_admin, u.disabled_at, u.created_at, u.updated_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
@@ -80,7 +80,7 @@ func (s *Store) SessionByTokenHash(ctx context.Context, tokenHash []byte) (Sessi
 	err := row.Scan(
 		&sess.ID, &sess.UserID, &sess.DeviceID, &sess.TokenHash, &sess.UserAgent, &sess.IP,
 		&sess.CreatedAt, &sess.LastSeenAt, &sess.LastRenewedAt, &sess.ExpiresAt,
-		&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerifiedAt,
+		&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerifiedAt, &user.PendingEmail,
 		&user.IsAdmin, &user.DisabledAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

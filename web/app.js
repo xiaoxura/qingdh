@@ -411,6 +411,15 @@
     sessionsBlock: $('#sessions-block'),
     sessionsList: $('#sessions-list'),
     adminLink: $('#admin-link'),
+    changeEmailBtn: $('#change-email'),
+    changeEmailHint: $('#email-change-hint'),
+    changeEmailDialog: $('#change-email-dialog'),
+    changeEmailForm: $('#change-email-form'),
+    changeEmailCurrent: $('#change-email-current'),
+    changeEmailPassword: $('#change-email-password'),
+    changeEmailNew: $('#change-email-new'),
+    changeEmailError: $('#change-email-error'),
+    changeEmailSubmit: $('#change-email-submit'),
     changePasswordBtn: $('#change-password'),
     logoutAllBtn: $('#logout-all'),
     logoutBtn: $('#logout'),
@@ -3059,8 +3068,13 @@
       setAccountAvatar(dom.accountAvatarMini, sync.user);
       dom.accountEmail.textContent = sync.user.email;
       const parts = [sync.user.emailVerified ? '邮箱已验证' : '邮箱未验证'];
+      if (sync.user.pendingEmail) parts.push(`待验证新邮箱 ${sync.user.pendingEmail}`);
       if (sync.lastSyncedAt) parts.push(`上次同步 ${formatTime(sync.lastSyncedAt)}`);
       dom.accountMeta.textContent = parts.join(' · ');
+      const emailChangeAvailable = Boolean(sync.user.emailChangeAvailable);
+      dom.changeEmailBtn.disabled = !emailChangeAvailable;
+      dom.changeEmailBtn.title = emailChangeAvailable ? '' : '需要管理员配置邮件服务后才能修改邮箱';
+      dom.changeEmailHint.hidden = emailChangeAvailable;
     } else {
       // 未登录显示中性的“个人中心”轮廓图标。
       setAccountAvatar(dom.accountAvatar, null);
@@ -3440,6 +3454,72 @@
       return;
     }
     showToast(apiError(response, '操作失败'));
+  }
+
+  function openChangeEmailDialog() {
+    if (!sync.user || !sync.user.emailChangeAvailable) return;
+    dom.changeEmailForm.reset();
+    dom.changeEmailError.hidden = true;
+    dom.changeEmailSubmit.disabled = false;
+    dom.changeEmailCurrent.textContent = sync.user.pendingEmail
+      ? `当前邮箱：${sync.user.email}；待验证新邮箱：${sync.user.pendingEmail}（重新提交会覆盖上一次请求）`
+      : `当前邮箱：${sync.user.email}`;
+    dom.changeEmailDialog.showModal();
+    requestAnimationFrame(() => dom.changeEmailPassword.focus());
+  }
+
+  async function handleChangeEmail(event) {
+    event.preventDefault();
+    dom.changeEmailError.hidden = true;
+
+    const password = dom.changeEmailPassword.value;
+    const newEmail = dom.changeEmailNew.value.trim();
+    if (!password) {
+      showAuthError(dom.changeEmailError, '请输入当前登录密码');
+      return;
+    }
+    if (!newEmail) {
+      showAuthError(dom.changeEmailError, '请输入新邮箱');
+      return;
+    }
+
+    dom.changeEmailSubmit.disabled = true;
+    const response = await api('/api/v1/auth/email-change', {
+      method: 'POST',
+      body: { password, newEmail },
+    });
+    dom.changeEmailSubmit.disabled = false;
+
+    if (response.ok) {
+      const pendingEmail = (response.data && response.data.pendingEmail) || newEmail;
+      sync.user.pendingEmail = pendingEmail;
+      dom.changeEmailForm.reset();
+      dom.changeEmailDialog.close();
+      updateSyncUI();
+      showToast('确认邮件已发送到新邮箱，请查收并打开链接');
+      return;
+    }
+    if (response.status === 401) {
+      dom.changeEmailDialog.close();
+      await handleAuthLost();
+      return;
+    }
+    const code = response.data && response.data.error && response.data.error.code;
+    const message =
+      code === 'email_taken'
+        ? '这个邮箱已经注册过了'
+        : code === 'same_email'
+          ? '新邮箱与当前邮箱相同'
+          : code === 'invalid_password'
+            ? '当前密码不正确'
+            : code === 'invalid_email'
+              ? apiError(response, '邮箱格式不正确')
+              : code === 'email_not_configured'
+                ? '当前实例未配置邮件服务，暂时无法修改邮箱'
+                : code === 'rate_limited'
+                  ? '操作过于频繁，请稍后再试'
+                  : apiError(response, '发送失败，请稍后再试');
+    showAuthError(dom.changeEmailError, message);
   }
 
   function openChangePasswordDialog() {
@@ -5870,6 +5950,8 @@
   }
   dom.logoutBtn.addEventListener('click', handleLogout);
   dom.logoutAllBtn.addEventListener('click', handleLogoutAll);
+  dom.changeEmailBtn.addEventListener('click', openChangeEmailDialog);
+  dom.changeEmailForm.addEventListener('submit', handleChangeEmail);
   dom.changePasswordBtn.addEventListener('click', openChangePasswordDialog);
   dom.changePasswordForm.addEventListener('submit', handleChangePassword);
   dom.deleteAccountBtn.addEventListener('click', () => {
@@ -6055,10 +6137,19 @@
     const verifyError = params.get(VERIFY_TOKEN_PARAM);
     const resetToken = params.get(RESET_TOKEN_PARAM);
     const loginRequested = params.get('login') === '1';
+    const emailChanged = params.get('email_changed') === '1';
+    const emailChangeError = params.get('email_change');
 
     if (verified === '1') showToast('邮箱验证成功，已登录');
     else if (verifyError === 'error') showToast('验证链接无效或已过期');
     else if (verifyError === 'rate_limited') showToast('请求过于频繁，请稍后再试');
+
+    if (emailChanged) showToast('账号邮箱已更新');
+    else if (emailChangeError === 'expired') showToast('确认链接无效或已过期，请重新发起修改');
+    else if (emailChangeError === 'taken') showToast('这个邮箱已被其他账号使用');
+    else if (emailChangeError === 'pending') showToast('待验证邮箱已变化，请以最新一封邮件为准');
+    else if (emailChangeError === 'rate_limited') showToast('请求过于频繁，请稍后再试');
+    else if (emailChangeError) showToast('邮箱修改失败，请重新发起');
 
     if (loginRequested) {
       state.openLoginAfterInit = true;
