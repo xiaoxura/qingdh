@@ -11,6 +11,7 @@ import (
 
 	"github.com/XiaoXuRa/qingdh/internal/auth"
 	"github.com/XiaoXuRa/qingdh/internal/config"
+	"github.com/XiaoXuRa/qingdh/internal/httpapi"
 	"github.com/XiaoXuRa/qingdh/internal/settings"
 )
 
@@ -532,5 +533,20 @@ func TestAdminOverview(t *testing.T) {
 
 	if denied := user.do(http.MethodGet, "/api/v1/admin/overview", ""); denied.status != http.StatusForbidden {
 		t.Fatalf("non-admin overview = %d %s", denied.status, denied.body)
+	}
+}
+
+func TestAdminReportsBuildVersion(t *testing.T) {
+	env := newEnvOpts(t, nil, httpapi.WithVersion("v0.1.0"))
+	admin := env.client(t)
+	registerVerified(t, env, admin, "version-admin@example.com", "correct horse battery")
+	env.makeAdmin(t, "version-admin@example.com")
+
+	resp := admin.do(http.MethodGet, "/api/v1/admin/settings", "")
+	if resp.status != http.StatusOK {
+		t.Fatalf("settings = %d %s", resp.status, resp.body)
+	}
+	if !strings.Contains(resp.body, `"serverVersion":"v0.1.0"`) {
+		t.Fatalf("build version missing from admin settings: %s", resp.body)
 	}
 }

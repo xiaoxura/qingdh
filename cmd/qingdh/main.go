@@ -407,7 +407,7 @@ func serve(args []string) error {
 	mailQueue.Start(rootCtx)
 	defer mailQueue.Close()
 
-	api, err := httpapi.New(cfg, st, settingsService, mailQueue, logger, staticFS)
+	api, err := httpapi.New(cfg, st, settingsService, mailQueue, logger, staticFS, httpapi.WithVersion(version))
 	if err != nil {
 		return err
 	}

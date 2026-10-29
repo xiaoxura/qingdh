@@ -38,6 +38,7 @@ type Server struct {
 	staticFS      http.Handler
 	limiter       *limiter
 	now           func() time.Time
+	version       string
 	ai            *ai.Service
 	metrics       *metrics.Registry
 	favicons      *faviconCache
@@ -52,6 +53,15 @@ type Server struct {
 // Option customises the server; used by tests to point the AI adapter at a
 // local upstream.
 type Option func(*Server)
+
+// WithVersion records the build version for the admin UI and diagnostics.
+func WithVersion(version string) Option {
+	return func(s *Server) {
+		if version != "" {
+			s.version = version
+		}
+	}
+}
 
 // WithAIProviders replaces the proxy provider allowlist.
 func WithAIProviders(providers map[string]ai.Provider) Option {
@@ -85,6 +95,7 @@ func New(cfg *config.Config, st *store.Store, stg *settings.Service, mailer mail
 		static:        staticFS,
 		limiter:       newLimiter(),
 		now:           time.Now,
+		version:       "dev",
 		dummyHash:     dummy,
 		ai:            ai.New(),
 		metrics:       metrics.New(),

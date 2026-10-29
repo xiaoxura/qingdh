@@ -388,7 +388,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | A4 关闭加密 | 已完成 | `TestDisableEncryption*`（未登录/未加密/密码错/409/依赖/成功 v2+审计）；`reliability.mjs`（失败保持加密、vault/sessionStorage 清理、明文保留、跨标签页通知） | 显式端点 + `DELETE /secrets/{kind}`；PUT 降级防护未放宽 |
 | A5 服务端版本历史 | 已完成 | 迁移 0010；`TestWorkspaceRevisions*`（成功写入才记录、409/跨用户、v3 保留、20 份/30 天、级联删除、8 并发仅 1 成功）+ `TestWorkspaceConcurrentPutsUseSingleRevision`；`reliability.mjs` 预览/恢复/快照；加密历史预览手工验证 | 新增 `/workspace/revisions` 两个只读接口；恢复复用 PUT，不新增恢复接口 |
 | A6 审计日志后台 | 已完成 | 迁移 0011；`TestAdminAudit*`（403、分页/动作/操作者筛选、删除管理员后 actor_email 保留、不泄露密文/密码/Key） | 新增 `GET /admin/audit` 与后台「审计」分类 |
-| A7 发布收口 | 待开始 | | 仅本地版本号、构建与文档；不推送 |
+| A7 发布收口 | 已完成（本地范围） | `qingdh version` = v0.1.0；linux/amd64 + arm64 静态构建成功；管理后台显示 `serverVersion`；README 增加升级/回滚；迁移 0009–0011 在空库与已有库顺序执行 | 按任务约束未添加 release workflow、未打 tag、未推送镜像/远端 |
 | C1 拆分 app.js | 待开始 | | |
 | C2 补测试 | 待开始 | | |
 | C3 同步效率 | 待开始 | | |

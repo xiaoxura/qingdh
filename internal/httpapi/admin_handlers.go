@@ -39,6 +39,7 @@ type adminSettingsDTO struct {
 	SessionRenewSeconds      int64  `json:"sessionRenewSeconds"`
 	AIDailyLimit             int    `json:"aiDailyLimit"`
 	Version                  int64  `json:"version"`
+	ServerVersion            string `json:"serverVersion"`
 
 	SMTPConfigured        bool `json:"smtpConfigured"`
 	EffectiveVerification bool `json:"effectiveVerification"`
@@ -78,7 +79,9 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetAdminSettings(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, toAdminSettingsDTO(s.settings.Get()))
+	dto := toAdminSettingsDTO(s.settings.Get())
+	dto.ServerVersion = s.version
+	writeJSON(w, http.StatusOK, dto)
 }
 
 type adminSettingsRequest struct {

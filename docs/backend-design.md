@@ -265,12 +265,17 @@ CREATE TABLE documents (
 | POST | `/auth/verify-email` | `{token}`，验证邮箱并签发会话 |
 | GET | `/auth/verify-email?token=` | 邮件链接入口，验证后 303 跳回首页 |
 | POST | `/auth/refresh` | 手动续期当前会话（正常由中间件自动完成） |
+| POST | `/auth/password` | `{currentPassword, newPassword}`；保留当前会话，撤销其他会话 |
+| POST | `/auth/email-change` | `{password, newEmail}`；写 `pending_email`，向新邮箱发确认链接 |
+| GET | `/change-email?token=` | 渲染确认页，不消费 token |
+| POST | `/change-email` | 消费 token；换邮箱、撤销其他会话、通知旧邮箱 |
 | POST | `/auth/resend-verification` | 重新发送验证邮件（限流） |
 | POST | `/auth/forgot-password` | `{email}`，恒定返回 202 |
 | POST | `/auth/reset-password` | `{token, password}`，重置并撤销全部会话 |
 | GET | `/auth/sessions` | 当前账号的登录设备列表 |
 | DELETE | `/auth/sessions/{id}` | 撤销指定会话 |
 | POST | `/auth/logout-all` | 撤销除当前外的全部会话 |
+| GET | `/admin/audit` | 审计分页与筛选（管理员，不返回密码/token/密文/用户内容） |
 | DELETE | `/account` | `{password}`，删除账号及全部数据 |
 | GET | `/account/export` | 导出导航 JSON（可选，前端也能本地导出） |
 | GET | `/admin/overview` | 数据概览计数（管理员，不含任何文档/密钥内容） |
@@ -288,6 +293,9 @@ CREATE TABLE documents (
 | --- | --- | --- |
 | GET | `/workspace` | `{revision, payload, updatedAt}` |
 | PUT | `/workspace` | `{baseRevision, payload}`（payload v2 或 v3 envelope），成功返回新 revision |
+| POST | `/workspace/disable-encryption` | `{baseRevision, currentPassword, payload}`；当前文档必须为 v3、payload 必须为 v2，成功后 revision+1 |
+| GET | `/workspace/revisions` | 最近 20 份历史版本元数据 `{revision, size, createdAt}` |
+| GET | `/workspace/revisions/{revision}` | 单个历史版本 `{revision, payload, size, createdAt}` |
 
 `PUT` 的核心写入：
 
@@ -637,6 +645,7 @@ CREATE TABLE user_secrets (
 | GET | `/ai` | 服务端返回 SPA shell，由前端渲染独立的 AI 搜索结果页 |
 | GET | `/api/v1/secrets/{kind}` | `{revision, payload, updatedAt}`；kind 白名单，缺失返回 revision 0 |
 | PUT | `/api/v1/secrets/{kind}` | `{baseRevision, payload}`；409 返回 `current` |
+| DELETE | `/api/v1/secrets/{kind}` | 删除该 kind 的云端密文（用于关闭主加密前清理 ai/memo） |
 | POST | `/api/v1/ai/chat` | 代理调用；密钥仅本次请求；SSE 流式 |
 | POST | `/api/v1/ai/test` | 可选，用最小请求测试供应商连接 |
 | POST | `/api/v1/ai/models` | 用用户 Key 读取供应商模型列表，不落库 |

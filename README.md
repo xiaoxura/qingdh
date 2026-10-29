@@ -168,6 +168,8 @@ chmod 600 config.yml        # 里面包含数据库密码
 - 只有密文上传到服务端，数据库、备份和管理员默认都看不到分组和链接。
 - 使用 PBKDF2-SHA256（600,000 次）派生密钥，AES-256-GCM 加密；随机数据密钥由密码包裹，修改加密密码只重新包裹密钥，不会重新加密全部链接。
 - 开启时会显示一次**恢复码**，必须离线保存；忘记密码时用它解锁并重置加密密码。
+- 恢复码可以在「安全与隐私 → 数据加密 → 重新生成恢复码」里更换；新码上传成功后旧码立即失效，已保存的链接和加密密码不受影响。
+- 「关闭加密」需要登录密码二次确认。关闭后云端与之后的备份只保存明文；历史版本、历史备份和已删除数据中的旧密文不会被自动清理。AI 配置与备忘录使用主数据密钥派生的密钥，存在时必须先导出或删除云端密文；隐私空间使用独立密钥，可以保留。
 - 新设备、无痕窗口或关闭标签页后重新打开，需要输入加密密码或恢复码；同一个标签页刷新会使用 `sessionStorage` 里的缓存，不反复询问。
 - 后台查看加密用户的数据时，也需要输入该用户的加密密码；密码不会发送到服务端。
 - 导出会得到加密 envelope 文件；导入时提示输入密码或恢复码。
@@ -185,7 +187,7 @@ chmod 600 config.yml        # 里面包含数据库密码
 需要注意：
 
 - 本地浏览器存储和本地快照仍是明文，加密保护的是云端和备份；共用电脑请自行清理浏览器数据。
-- 开启加密**不会**清理历史备份；升级前的备份里可能仍有明文。
+- 开启或关闭加密都**不会**清理历史备份、历史版本和已删除数据；这些位置可能仍保留旧明文或旧密文，需要自行处置。
 - 忘记加密密码且丢失恢复码 = 云端数据无法恢复。
 - 忘记隐私密码且丢失隐私恢复码 = 隐私空间无法恢复，但普通数据不受影响。
 - 加密后的导航文档上限为 512 KiB（Base64 膨胀后的限制）；备忘录整体另有约 360 KiB 明文预算，超过时会提示精简。
@@ -206,6 +208,25 @@ chmod 600 config.yml        # 里面包含数据库密码
 - JSON 导入先预览，默认合并并保留当前设置与已有条目，也可明确选择替换；超出数量或容量限制时阻止导入。
 - 导出：设置 → 同步与数据 → 数据管理 → 导出备份；登录并开启加密时导出的是加密数据。
 - 服务端备份：`pg_dump -Fc qingdh > qingdh-$(date +%F).dump`，恢复用 `pg_restore -d qingdh`。
+- 服务端保留最近 20 个、最多 30 天的导航文档历史版本；可在「同步与数据 → 数据管理 → 历史版本」预览和恢复，恢复前会先在本机保存快照。
+
+### 升级与回滚
+
+```bash
+# 1. 先备份数据库
+pg_dump -Fc qingdh > qingdh-before-upgrade-$(date +%F).dump
+
+# 2. 构建或拉取新版本（版本号通过 ldflags 注入）
+CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=v0.1.0" -o qingdh ./cmd/qingdh
+
+# 3. 只执行迁移，确认输出后再重启
+./qingdh migrate -config config.yml
+./qingdh version
+```
+
+- 迁移只向前执行，`migrations/*.sql` 的 Down 段不会被自动运行；升级前必须备份。新增迁移只加列/表，旧版本的读取逻辑不受影响。
+- 回滚以「镜像/二进制回滚 + 手工执行对应 Down 段」为准。若只是回到旧二进制且新列可空（本轮迁移都满足），通常无需回滚 schema；确认不再需要新数据后再手工 Down。
+- 管理后台左下角显示当前后端版本（来自构建时的 `-ldflags`），便于排查前后端版本错配。
 
 ## 可选：Docker
 
@@ -241,21 +262,27 @@ python3 -m http.server 8080 --directory web
 ```text
 POST   /auth/register            POST /auth/login          POST /auth/logout
 GET    /auth/me                  POST /auth/refresh
+POST   /auth/password            POST /auth/email-change   # 登录态改密 / 改邮箱
 POST   /auth/verify-email        GET  /verify-email?token=
+GET    /change-email?token=      POST /change-email         # 确认新邮箱（不消费 GET）
 POST   /auth/resend-verification POST /auth/forgot-password
 POST   /auth/reset-password
 GET    /auth/sessions            DELETE /auth/sessions/{id}
 POST   /auth/logout-all
 DELETE /account                  GET  /account/export
 GET    /workspace                PUT  /workspace
+POST   /workspace/disable-encryption
+GET    /workspace/revisions      GET  /workspace/revisions/{revision}
 
 GET    /secrets/{kind}           PUT  /secrets/{kind}      # kind: ai | memo | privacy
+DELETE /secrets/{kind}
 POST   /ai/chat                  POST /ai/test             # 密钥仅本次请求，SSE 流式
 
 GET    /admin/settings           PUT  /admin/settings
 POST   /admin/settings/test-email
 GET    /admin/users              PATCH /admin/users/{id}
 DELETE /admin/users/{id}
+GET    /admin/audit
 
 GET    /healthz                  GET  /readyz
 GET    /api/favicon?u=<origin>   GET  /metrics（可选，Bearer token）

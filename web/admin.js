@@ -20,6 +20,7 @@
     sidebarUser: $('#sidebar-user'),
     sidebarEmail: $('#sidebar-email'),
     sidebarAvatar: $('#sidebar-avatar'),
+    serverVersion: $('#server-version'),
 
     tabs: Array.from(document.querySelectorAll('.tab')),
     overviewPanel: $('#panel-overview'),
@@ -504,6 +505,9 @@
   }
 
   function fillSettings(values) {
+    if (dom.serverVersion) {
+      dom.serverVersion.textContent = `版本 ${values.serverVersion || 'dev'}`;
+    }
     state.settings = values;
     dom.siteName.value = values.siteName || '氢导航';
     state.siteLogo = values.siteLogo || '';
