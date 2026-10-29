@@ -194,6 +194,12 @@
     return dropped;
   }
 
+  // 自动同步开关只挡后台事件（focus/visible/online、编辑后的 debounce）；
+  // 手动同步、登录首拉和用户主动触发的读取不受影响。
+  function autoSyncAllowed(prefs, { manual = false } = {}) {
+    return manual === true || !prefs || prefs.autoSync !== false;
+  }
+
   // Favicons go through the same-origin proxy, so a homepage with many links
   // does not leak the whole bookmark list to each third-party site.
   function faviconOf(url) {
@@ -217,6 +223,7 @@
     isURL,
     hostOf,
     faviconOf,
+    autoSyncAllowed,
     fairQuotas,
     enforceLimits,
   };

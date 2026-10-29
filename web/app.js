@@ -2558,7 +2558,7 @@
     }
 
     // Envelope not loaded yet: a sync pulls and unlocks it.
-    await syncNow();
+    await syncNow({ manual: true });
     return Boolean(cryptoState.dataKeyRaw);
   }
 
@@ -2632,7 +2632,7 @@
 
     dom.encryptSubmit.disabled = true;
     try {
-      await syncNow();
+      await syncNow({ manual: true });
       if (sync.revision == null) {
         throw new Error('请先完成一次云端同步');
       }
@@ -2819,7 +2819,7 @@
   async function unlockFromPanel() {
     if (!cryptoState.enabled) return;
     if (!cryptoState.envelope) {
-      await syncNow();
+      await syncNow({ manual: true });
       return;
     }
     const opened = await promptUnlock(cryptoState.envelope);
@@ -2828,7 +2828,7 @@
     cryptoState.unlocked = true;
     cacheDataKey(opened.dataKeyRaw);
     updateEncryptionUI();
-    await syncNow();
+    await syncNow({ manual: true });
   }
 
   async function submitUnlock(event) {
@@ -3775,8 +3775,11 @@
     setStatus('paused');
   }
 
-  async function syncNow({ pullOnly = false } = {}) {
+  async function syncNow({ pullOnly = false, manual = false } = {}) {
     if (!sync.user || sync.inFlight) return;
+    // 自动同步关闭后，focus/可见性/联网等事件触发的同步一律跳过；
+    // 手动同步和用户主动操作（解锁、导出、开启加密等）仍然可用。
+    if (!core.autoSyncAllowed(prefs, { manual })) return;
     sync.inFlight = true;
     const sessionSeq = sync.sessionSeq;
     updateSyncUI();
@@ -4728,7 +4731,7 @@
     }
 
     if (!(await ensureUnlockedForPush())) return;
-    await syncNow();
+    await syncNow({ manual: true });
 
     const response = await api('/api/v1/workspace');
     if (!response.ok) {
@@ -5778,12 +5781,12 @@
   dom.resetForm.addEventListener('submit', handleResetPassword);
   dom.deleteForm.addEventListener('submit', handleDeleteAccount);
 
-  if (dom.syncPageNow) dom.syncPageNow.addEventListener('click', () => syncNow());
+  if (dom.syncPageNow) dom.syncPageNow.addEventListener('click', () => syncNow({ manual: true }));
   if (dom.syncAutoToggle) {
     dom.syncAutoToggle.addEventListener('change', () => {
       prefs.autoSync = dom.syncAutoToggle.checked;
       savePrefs();
-      if (prefs.autoSync) syncNow();
+      if (prefs.autoSync) syncNow({ manual: true });
       else if (sync.dirty) setStatus(sync.online ? 'dirty' : 'offline');
       renderSyncManager();
     });

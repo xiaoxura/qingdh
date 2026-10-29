@@ -47,6 +47,13 @@ test('timestamp helpers reject non-positive values', () => {
   assert.equal(core.toTombstone('5'), 5);
 });
 
+test('B3 auto sync switch only blocks event-driven syncs', () => {
+  assert.equal(core.autoSyncAllowed({ autoSync: true }), true);
+  assert.equal(core.autoSyncAllowed({ autoSync: false }), false);
+  assert.equal(core.autoSyncAllowed({ autoSync: false }, { manual: true }), true);
+  assert.equal(core.autoSyncAllowed(null), true);
+});
+
 /* ------------------------------------------------------------------ *
  * B1：限额保留最新数据，且不会让后面的分组饿死
  * ------------------------------------------------------------------ */

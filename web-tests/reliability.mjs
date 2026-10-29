@@ -95,6 +95,39 @@ async function main() {
   const customEngineInfo = JSON.parse(customEngine.value || '{}');
   check('custom search engine can be selected from the menu', customEngineInfo.found === true && customEngineInfo.label === '站内搜索' && customEngineInfo.selected === 'true', customEngine.value);
 
+  // B3：关闭自动同步后，编辑不上传；手动同步仍然可用。
+  const autoSync = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    for(let i=0;i<40;i++){await sleep(100);if(document.getElementById('sync-badge').dataset.status==='synced')break;}
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="sync"]').click(); await sleep(250);
+    const toggle=document.getElementById('sync-auto-toggle');
+    if(toggle.checked){toggle.checked=false;toggle.dispatchEvent(new Event('change',{bubbles:true}));}
+    await sleep(200);
+    document.getElementById('hub-dialog').close(); await sleep(150);
+    document.getElementById('add-link-btn').click(); await sleep(120);
+    document.getElementById('link-title').value='AutoOff';
+    document.getElementById('link-url').value='https://example.com/auto-off';
+    document.getElementById('link-form').requestSubmit();
+    await sleep(2400);
+    const before=await (await fetch('/api/v1/workspace')).json();
+    const beforeTitles=before.payload.groups.flatMap(g=>g.links.map(l=>l.title));
+    const dirty=document.getElementById('sync-badge').dataset.status;
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="sync"]').click(); await sleep(200);
+    document.getElementById('sync-page-now').click();
+    for(let i=0;i<60;i++){await sleep(100);if(document.getElementById('sync-badge').dataset.status==='synced')break;}
+    document.getElementById('hub-dialog').close();
+    const after=await (await fetch('/api/v1/workspace')).json();
+    const afterTitles=after.payload.groups.flatMap(g=>g.links.map(l=>l.title));
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="sync"]').click(); await sleep(200);
+    const restore=document.getElementById('sync-auto-toggle');
+    if(!restore.checked){restore.checked=true;restore.dispatchEvent(new Event('change',{bubbles:true}));}
+    document.getElementById('hub-dialog').close();
+    return JSON.stringify({dirty, beforeHas:beforeTitles.includes('AutoOff'), afterHas:afterTitles.includes('AutoOff'), status:document.getElementById('sync-badge').dataset.status});})()`);
+  const autoSyncInfo = JSON.parse(autoSync.value || '{}');
+  check('auto sync off keeps edits local until a manual sync', autoSyncInfo.dirty === 'dirty' && autoSyncInfo.beforeHas === false && autoSyncInfo.afterHas === true, autoSync.value);
+
   const avatar = await tab1.evaluate(`JSON.stringify((()=>{const m=document.getElementById('account-avatar-mini');return {text:m.textContent.trim(),art:!!m.querySelector('.avatar-art'),index:m.dataset.avatar};})())`);
   const avatarInfo = JSON.parse(avatar.value || '{}');
   check('account avatar comes from the DiceBear library', avatarInfo.text === '' && avatarInfo.art === true && /^\d+$/.test(avatarInfo.index || '') && Number(avatarInfo.index) < 24, avatar.value);
