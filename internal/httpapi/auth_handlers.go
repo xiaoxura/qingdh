@@ -50,9 +50,21 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "注册过于频繁，请稍后再试")
 		return
 	}
+	if values.VerificationRequired() {
+		// 未配置站点地址/可信 Host 时不能生成可信的验证链接，提前拒绝，
+		// 避免创建出一个收不到验证邮件的账号。
+		if _, baseErr := s.mailBaseURL(r); baseErr != nil {
+			s.logger.Warn("verification email disabled: no trusted site URL")
+			writeError(w, http.StatusServiceUnavailable, "email_not_configured", "管理员尚未设置站点地址，暂时无法发送验证邮件")
+			return
+		}
+	}
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		s.logger.Error("hash password", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
 		return
@@ -70,7 +82,13 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if values.VerificationRequired() {
-		if err := s.sendVerification(r.Context(), user, s.baseURLFor(r)); err != nil {
+		base, baseErr := s.mailBaseURL(r)
+		if baseErr != nil {
+			s.logger.Error("send verification mail: missing base URL", "user_id", user.ID.String())
+			writeError(w, http.StatusServiceUnavailable, "email_not_configured", "管理员尚未设置站点地址，暂时无法发送验证邮件")
+			return
+		}
+		if err := s.sendVerification(r.Context(), user, base); err != nil {
 			s.logger.Error("send verification mail", "error", err, "user_id", user.ID.String())
 			writeError(w, http.StatusBadGateway, "email_send_failed", "验证邮件发送失败，请稍后重新发送")
 			return
@@ -146,10 +164,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		hash = user.PasswordHash
 	}
 	ok, verifyErr := auth.VerifyPassword(req.Password, hash)
-	if verifyErr != nil && lookupErr == nil {
-		s.logger.Error("verify stored hash", "error", verifyErr, "user_id", user.ID.String())
-		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
-		return
+	if verifyErr != nil {
+		if writePasswordBusy(w, verifyErr) {
+			return
+		}
+		if lookupErr == nil {
+			s.logger.Error("verify stored hash", "error", verifyErr, "user_id", user.ID.String())
+			writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+			return
+		}
 	}
 	if lookupErr != nil || !ok {
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "邮箱或密码不正确")
@@ -387,9 +410,11 @@ func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request
 	}
 
 	if s.settings.Get().SMTPConfigured() {
-		user, err := s.store.UserByEmail(r.Context(), email)
-		if err == nil && !user.Verified() {
-			if sendErr := s.sendVerification(r.Context(), user, s.baseURLFor(r)); sendErr != nil {
+		base, baseErr := s.mailBaseURL(r)
+		if baseErr != nil {
+			s.logger.Warn("resend verification skipped: no trusted site URL")
+		} else if user, err := s.store.UserByEmail(r.Context(), email); err == nil && !user.Verified() {
+			if sendErr := s.sendVerification(r.Context(), user, base); sendErr != nil {
 				s.logger.Error("resend verification", "error", sendErr, "user_id", user.ID.String())
 			}
 		}
@@ -415,13 +440,16 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusTooManyRequests, "rate_limited", "请求过于频繁，请稍后再试")
 			return
 		}
-		if user, lookupErr := s.store.UserByEmail(r.Context(), email); lookupErr == nil {
+		base, baseErr := s.mailBaseURL(r)
+		if baseErr != nil {
+			s.logger.Warn("password reset email skipped: no trusted site URL")
+		} else if user, lookupErr := s.store.UserByEmail(r.Context(), email); lookupErr == nil {
 			raw, hash, tokenErr := auth.NewToken()
 			if tokenErr != nil {
 				s.logger.Error("generate reset token", "error", tokenErr)
 			} else if storeErr := s.store.CreateEmailToken(r.Context(), user.ID, store.TokenResetPassword, hash, s.now().Add(resetTokenTTL)); storeErr != nil {
 				s.logger.Error("store reset token", "error", storeErr)
-			} else if sendErr := s.mailer.Send(r.Context(), mail.ResetMessage(s.baseURLFor(r), user.Email, raw)); sendErr != nil {
+			} else if sendErr := s.mailer.Send(r.Context(), mail.ResetMessage(base, user.Email, raw)); sendErr != nil {
 				s.logger.Error("send reset mail", "error", sendErr, "user_id", user.ID.String())
 			}
 		}
@@ -459,6 +487,9 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
 		s.logger.Error("hash password", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
 		return

@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+
+	"github.com/XiaoXuRa/qingdh/internal/auth"
 )
 
 // errorBody is the uniform error envelope returned by every API endpoint.
@@ -42,4 +45,16 @@ func writeErrorWith(w http.ResponseWriter, status int, code, message string, ext
 		body[k] = v
 	}
 	writeJSON(w, status, body)
+}
+
+// writePasswordBusy maps the shared Argon2 slot limiter to a retryable 503.
+// It returns true when the error was a busy signal, so callers can fall back
+// to their normal internal-error handling otherwise.
+func writePasswordBusy(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, auth.ErrPasswordBusy) {
+		return false
+	}
+	w.Header().Set("Retry-After", "2")
+	writeError(w, http.StatusServiceUnavailable, "server_busy", "服务器繁忙，请稍后再试")
+	return true
 }

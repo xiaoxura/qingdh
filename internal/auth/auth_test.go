@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -86,5 +87,45 @@ func TestTokenRoundTrip(t *testing.T) {
 	}
 	if string(hash) == string(HashToken(raw+"x")) {
 		t.Fatal("different tokens must hash differently")
+	}
+}
+
+func TestPasswordHashingRejectsWhenSaturated(t *testing.T) {
+	hash, err := HashPassword("correct horse battery")
+	if err != nil {
+		t.Fatalf("prepare hash: %v", err)
+	}
+
+	// 占满全部并发槽，模拟四个请求正在做 Argon2。
+	for i := 0; i < maxConcurrentHashes; i++ {
+		if !acquireHashSlot() {
+			t.Fatalf("slot %d should be available", i)
+		}
+	}
+	released := false
+	t.Cleanup(func() {
+		if released {
+			return
+		}
+		for i := 0; i < maxConcurrentHashes; i++ {
+			releaseHashSlot()
+		}
+	})
+
+	if _, err := HashPassword("correct horse battery"); !errors.Is(err, ErrPasswordBusy) {
+		t.Fatalf("HashPassword error = %v, want ErrPasswordBusy", err)
+	}
+	if ok, err := VerifyPassword("correct horse battery", hash); !errors.Is(err, ErrPasswordBusy) {
+		t.Fatalf("VerifyPassword error = %v, want ErrPasswordBusy (ok=%v)", err, ok)
+	}
+
+	// 槽位释放后恢复正常。
+	for i := 0; i < maxConcurrentHashes; i++ {
+		releaseHashSlot()
+	}
+	released = true
+	ok, err := VerifyPassword("correct horse battery", hash)
+	if err != nil || !ok {
+		t.Fatalf("VerifyPassword after release: ok=%v err=%v", ok, err)
 	}
 }

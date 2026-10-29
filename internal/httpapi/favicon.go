@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"io"
@@ -29,39 +30,79 @@ type faviconEntry struct {
 	ok        bool
 }
 
+type faviconCacheItem struct {
+	origin  string
+	entry   faviconEntry
+	element *list.Element
+}
+
+// faviconCache 是带容量上限的 LRU：命中会移到队首，满了淘汰最久未使用的
+// 条目，避免旧实现里“随机删一个”导致热门的 favicon 反复回源。
 type faviconCache struct {
-	mu      sync.Mutex
-	entries map[string]faviconEntry
+	mu       sync.Mutex
+	entries  map[string]*faviconCacheItem
+	order    *list.List
+	capacity int
 }
 
 func newFaviconCache() *faviconCache {
-	return &faviconCache{entries: make(map[string]faviconEntry)}
+	return &faviconCache{
+		entries:  make(map[string]*faviconCacheItem),
+		order:    list.New(),
+		capacity: faviconCacheEntries,
+	}
 }
 
 func (c *faviconCache) get(origin string) (faviconEntry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	entry, ok := c.entries[origin]
+	item, ok := c.entries[origin]
 	if !ok {
 		return faviconEntry{}, false
 	}
-	if time.Now().After(entry.expiresAt) {
-		delete(c.entries, origin)
+	if time.Now().After(item.entry.expiresAt) {
+		c.removeLocked(item)
 		return faviconEntry{}, false
 	}
-	return entry, true
+	c.order.MoveToFront(item.element)
+	return item.entry, true
 }
 
 func (c *faviconCache) put(origin string, entry faviconEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.entries) >= faviconCacheEntries {
-		for key := range c.entries {
-			delete(c.entries, key)
-			break
-		}
+	if item, ok := c.entries[origin]; ok {
+		item.entry = entry
+		c.order.MoveToFront(item.element)
+		return
 	}
-	c.entries[origin] = entry
+	element := c.order.PushFront(origin)
+	c.entries[origin] = &faviconCacheItem{origin: origin, entry: entry, element: element}
+	for c.order.Len() > c.capacity {
+		oldest := c.order.Back()
+		key := oldest.Value.(string)
+		c.order.Remove(oldest)
+		delete(c.entries, key)
+	}
+}
+
+func (c *faviconCache) removeLocked(item *faviconCacheItem) {
+	c.order.Remove(item.element)
+	delete(c.entries, item.origin)
+}
+
+// allowedFaviconPort limits the proxy to the default web ports. Without this a
+// public host:port could be used to probe arbitrary services through the
+// favicon endpoint.
+func allowedFaviconPort(scheme, port string) bool {
+	switch scheme {
+	case "http":
+		return port == "" || port == "80"
+	case "https":
+		return port == "" || port == "443"
+	default:
+		return false
+	}
 }
 
 // handleFavicon proxies /favicon.ico through the server so a homepage with
@@ -79,6 +120,10 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		http.Error(w, "invalid origin", http.StatusBadRequest)
+		return
+	}
+	if !allowedFaviconPort(parsed.Scheme, parsed.Port()) {
+		http.Error(w, "unsupported port", http.StatusBadRequest)
 		return
 	}
 	origin := parsed.Scheme + "://" + parsed.Host

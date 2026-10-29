@@ -148,6 +148,9 @@ func newEnvOpts(t *testing.T, mutate func(*config.Config, *settings.Values), opt
 	values.SMTPHost = "smtp.example.com"
 	values.SMTPPort = 587
 	values.SMTPFrom = "noreply@example.com"
+	// 邮件链接不再信任请求 Host；测试统一给一个固定站点地址，个别用例
+	// 会把它清空以覆盖“未配置站点地址”的拒绝路径。
+	values.BaseURL = "http://qingdh.test"
 	if mutate != nil {
 		mutate(cfg, &values)
 	}

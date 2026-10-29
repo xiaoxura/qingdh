@@ -12,8 +12,9 @@ import (
 )
 
 func TestTrustedHostGuardAndEmailLinks(t *testing.T) {
-	env := newEnv(t, func(cfg *config.Config, _ *settings.Values) {
+	env := newEnv(t, func(cfg *config.Config, values *settings.Values) {
 		cfg.TrustedHosts = []string{"nav.example.com"}
+		values.BaseURL = ""
 	})
 	c := env.client(t)
 

@@ -29,8 +29,34 @@ const (
 // ErrInvalidHash is returned when a stored hash cannot be parsed.
 var ErrInvalidHash = errors.New("auth: invalid password hash")
 
+// ErrPasswordBusy 表示 Argon2 并发槽位已满。每次哈希约占 19 MiB，不能无限
+// 排队，否则少量并发登录就能把进程内存打满；调用方应返回 503/429。
+var ErrPasswordBusy = errors.New("auth: password hashing busy")
+
+// maxConcurrentHashes 限制单实例同时进行的 Argon2 计算数量。
+const maxConcurrentHashes = 4
+
+var hashSlots = make(chan struct{}, maxConcurrentHashes)
+
+// acquireHashSlot 非阻塞地占用一个哈希槽；返回 false 表示应直接拒绝请求。
+func acquireHashSlot() bool {
+	select {
+	case hashSlots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func releaseHashSlot() { <-hashSlots }
+
 // HashPassword derives an Argon2id hash encoded in the standard PHC format.
 func HashPassword(password string) (string, error) {
+	if !acquireHashSlot() {
+		return "", ErrPasswordBusy
+	}
+	defer releaseHashSlot()
+
 	salt := make([]byte, argonSaltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("generate salt: %w", err)
@@ -75,6 +101,11 @@ func VerifyPassword(password, encoded string) (bool, error) {
 	if err != nil {
 		return false, ErrInvalidHash
 	}
+
+	if !acquireHashSlot() {
+		return false, ErrPasswordBusy
+	}
+	defer releaseHashSlot()
 
 	got := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1, nil

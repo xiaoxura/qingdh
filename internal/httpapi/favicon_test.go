@@ -17,6 +17,8 @@ func TestFaviconProxyRejectsPrivateAndNonHTTPSchemes(t *testing.T) {
 		"http://10.0.0.1",
 		"file:///etc/passwd",
 		"javascript:alert(1)",
+		"http://example.com:8080",
+		"https://example.com:8443",
 	} {
 		resp := c.do(http.MethodGet, "/api/favicon?u="+url.QueryEscape(target), "")
 		if resp.status == http.StatusOK {

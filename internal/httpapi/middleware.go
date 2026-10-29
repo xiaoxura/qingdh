@@ -345,26 +345,30 @@ func (s *Server) requestOrigin(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-// baseURLFor returns the canonical URL for links in emails: the value set in
-// /admin when present, otherwise the origin of the current request.
-func (s *Server) baseURLFor(r *http.Request) *url.URL {
+// errMailBaseURL 表示既没有配置站点地址，也没有可信 Host 可用于邮件链接。
+var errMailBaseURL = errors.New("httpapi: no trusted base URL for email links")
+
+// mailBaseURL returns the canonical URL for links in emails. A request Host is
+// never trusted on its own: without a configured site URL or trusted_hosts an
+// attacker could poison verification/reset links by forging the Host header.
+// Callers must treat errMailBaseURL as "do not send" and tell the operator to
+// set the site address.
+func (s *Server) mailBaseURL(r *http.Request) (*url.URL, error) {
 	if base := s.settings.Get().BaseURLValue(); base != nil {
-		return base
+		return base, nil
+	}
+	if len(s.cfg.TrustedHosts) == 0 {
+		return nil, errMailBaseURL
 	}
 	scheme := "http"
 	if s.requestTransportSecure(r) {
 		scheme = "https"
 	}
-	// 邮件链接不能盲信任意 Host：配置了可信域名时，优先使用与请求匹配的
-	// 可信 Host，否则固定使用列表中的第一个。
-	if len(s.cfg.TrustedHosts) > 0 {
-		host := s.cfg.TrustedHosts[0]
-		if s.hostTrusted(r.Host) {
-			host = strings.ToLower(strings.TrimSpace(r.Host))
-		}
-		return &url.URL{Scheme: scheme, Host: host}
+	host := s.cfg.TrustedHosts[0]
+	if s.hostTrusted(r.Host) {
+		host = strings.ToLower(strings.TrimSpace(r.Host))
 	}
-	return &url.URL{Scheme: scheme, Host: r.Host}
+	return &url.URL{Scheme: scheme, Host: host}, nil
 }
 
 // requireJSON enforces a JSON body on state-changing requests that carry one.

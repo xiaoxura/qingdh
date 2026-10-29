@@ -29,7 +29,14 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	// Require the password even for sessions: deleting an account is the most
 	// destructive action in the product.
 	verified, err := auth.VerifyPassword(req.Password, user.PasswordHash)
-	if err != nil || !verified {
+	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+	if !verified {
 		writeError(w, http.StatusForbidden, "invalid_password", "密码不正确")
 		return
 	}

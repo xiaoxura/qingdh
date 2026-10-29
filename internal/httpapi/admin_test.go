@@ -122,14 +122,29 @@ func TestAdminBaseURLIsUsedInEmails(t *testing.T) {
 	}
 }
 
-func TestRegistrationMailUsesRequestOriginWithoutBaseURL(t *testing.T) {
-	env := newEnv(t, nil)
+func TestEmailSendingRequiresTrustedSiteURL(t *testing.T) {
+	// 没有站点地址也没有 trusted_hosts 时，邮件链接会被请求 Host 污染，
+	// 因此必须拒绝发信，而不是回退到 r.Host。
+	env := newEnv(t, func(_ *config.Config, values *settings.Values) { values.BaseURL = "" })
 	c := env.client(t)
-	if r := c.register("origin@example.com", "correct horse battery"); r.status != http.StatusAccepted {
-		t.Fatalf("register = %d %s", r.status, r.body)
+
+	resp := c.register("origin@example.com", "correct horse battery")
+	if resp.status != http.StatusServiceUnavailable || !strings.Contains(resp.body, "email_not_configured") {
+		t.Fatalf("register without trusted origin = %d %s", resp.status, resp.body)
 	}
-	if msg := env.mailer.last().Text; !strings.Contains(msg, env.server.URL+"/verify-email?token=") {
-		t.Fatalf("mail link does not use request origin: %s", msg)
+	if len(env.mailer.messages) != 0 {
+		t.Fatalf("no email may be sent without a trusted origin, got %d", len(env.mailer.messages))
+	}
+	if _, err := env.store.UserByEmail(t.Context(), "origin@example.com"); err == nil {
+		t.Fatal("the account should not be created when its verification link cannot be sent")
+	}
+
+	// 找回密码保持恒定 202，但不会发出任何邮件。
+	if forgot := c.do(http.MethodPost, "/api/v1/auth/forgot-password", `{"email":"origin@example.com"}`); forgot.status != http.StatusAccepted {
+		t.Fatalf("forgot = %d %s", forgot.status, forgot.body)
+	}
+	if len(env.mailer.messages) != 0 {
+		t.Fatalf("no reset email may be sent without a trusted origin, got %d", len(env.mailer.messages))
 	}
 }
 

@@ -141,12 +141,15 @@ func openStore(ctx context.Context, cfg *config.Config) (*store.Store, error) {
 	return store.Open(ctx, cfg.Database.DSN(), cfg.Database.MaxConns)
 }
 
-func logSettingsWarnings(logger *slog.Logger, values settings.Values) {
+func logSettingsWarnings(logger *slog.Logger, values settings.Values, trustedHosts []string) {
 	if values.BaseURL == "" {
 		logger.Warn("站点地址未设置，将根据请求自动识别；建议在管理后台设置站点地址")
 	}
 	if !values.SMTPConfigured() && values.RequireEmailVerification {
 		logger.Warn("SMTP 未配置，邮箱验证已自动关闭；可在 /admin 中配置 SMTP")
+	}
+	if values.SMTPConfigured() && values.BaseURL == "" && len(trustedHosts) == 0 {
+		logger.Warn("SMTP 已配置，但站点地址与 server.trusted_hosts 都为空；邮件链接无法安全生成，验证/找回邮件将不发送")
 	}
 	if values.SMTPConfigured() && values.SMTPUsername != "" && values.SMTPTLS == "none" {
 		logger.Warn("SMTP 使用明文连接，凭据会以明文发送")
@@ -381,7 +384,7 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	logSettingsWarnings(logger, settingsService.Get())
+	logSettingsWarnings(logger, settingsService.Get(), cfg.TrustedHosts)
 	logProxyWarnings(logger, cfg, settingsService.Get())
 	go settingsService.StartRefresher(rootCtx, 30*time.Second)
 
