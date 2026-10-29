@@ -1,0 +1,13 @@
+.git
+.gitignore
+config.yml
+.env
+docs
+*.md
+*.log
+qingdh
+qingdh.new
+qingdh-*
+coverage.out
+.tmp
+web-tests

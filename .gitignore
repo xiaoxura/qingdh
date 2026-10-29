@@ -1,0 +1,28 @@
+# Build output
+/qingdh
+/qingdh.new
+/dist/
+/.tmp/
+
+# Local configuration and data
+config.yml
+.env
+.env.local
+*.log
+
+# Test artefacts
+coverage.out
+
+# Local test credentials
+TEST_ACCOUNTS.md
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local CI and backup artefacts
+config.ci.yml
+*.dump
+*.test

@@ -1,0 +1,51 @@
+# ===========================================================================
+# 氢导航 启动配置
+#
+# 只包含启动必须的配置：监听地址和数据库连接字段。
+# 站点地址、注册开关、邮箱验证、SMTP、会话时长等在管理后台 /admin 修改，
+# 保存在数据库里，改完立即生效。
+#
+# 复制为 config.yml 后修改；config.yml 含数据库密码，注意 chmod 600。
+# ===========================================================================
+
+server:
+  # 监听地址
+  listen: ":8080"
+
+  # 反向代理的 CIDR 列表。只有来自这些地址的 X-Forwarded-For /
+  # X-Forwarded-Proto 会被信任。放在 Nginx/Caddy 后面时建议配置。
+  # trusted_proxies:
+  #   - 172.16.0.0/12
+  #   - 10.0.0.0/8
+
+  # 可信对外域名（可带端口）。配置后：Host 不在列表中的请求会被拒绝，
+  # 未设置站点地址时邮件链接也只用这里的域名，避免 Host 头伪造。
+  # trusted_hosts:
+  #   - nav.example.com
+
+  # 可选：设置后启用 GET /metrics（Prometheus 文本格式）。留空则接口不存在。
+  # 使用 Authorization: Bearer <token> 或 ?token=<token> 访问。
+  # metrics_token: "replace-with-a-long-random-token"
+
+database:
+  host: "127.0.0.1"
+  port: 5432
+  user: "qingdh"
+  password: "qingdh"
+  name: "qingdh"
+
+  # disable | allow | prefer | require | verify-ca | verify-full
+  sslmode: "prefer"
+
+  # 连接池上限，默认 10
+  max_conns: 10
+
+  # 启动时自动执行迁移，默认 true
+  migrate_on_start: true
+
+# debug / info / warn / error
+log_level: "info"
+
+# 仅开发时使用：从磁盘读取前端资源，改完刷新即可，不必重新编译。
+# 相对路径基于本配置文件所在目录。
+# web_dir: "web"

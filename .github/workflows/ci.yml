@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Format
+        run: test -z "$(gofmt -l .)"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          "$(go env GOPATH)/bin/staticcheck" ./...
+
+      - name: Govulncheck
+        # Advisory: standard-library findings depend on the patch release
+        # installed by setup-go and should not block unrelated PRs.
+        continue-on-error: true
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
+      - name: Test with coverage
+        run: |
+          go test -race -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tail -1
+
+      - name: Build
+        run: CGO_ENABLED=0 go build -trimpath -o qingdh ./cmd/qingdh
+
+  web:
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qingdh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: JavaScript syntax
+        run: for f in web/*.js web/lib/*.js; do node --check "$f"; done
+
+      - name: Frontend unit tests
+        run: node --test web-tests/unit/*.test.mjs
+
+      - name: Frontend reliability
+        run: |
+          cat > config.ci.yml <<'YAML'
+          server:
+            listen: "127.0.0.1:8080"
+          database:
+            host: "127.0.0.1"
+            port: 5432
+            user: "postgres"
+            password: "postgres"
+            name: "qingdh"
+            sslmode: "disable"
+          log_level: "warn"
+          YAML
+          CGO_ENABLED=0 go build -trimpath -o qingdh ./cmd/qingdh
+          ./qingdh serve -config config.ci.yml >/tmp/qingdh.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080/healthz >/dev/null; then break; fi
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:8080/healthz
+          node web-tests/reliability.mjs
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qingdh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: qingdh:ci
+
+      - name: Run container smoke test
+        run: |
+          cat > config.ci.yml <<'YAML'
+          server:
+            listen: "127.0.0.1:8080"
+          database:
+            host: "127.0.0.1"
+            port: 5432
+            user: "postgres"
+            password: "postgres"
+            name: "qingdh"
+            sslmode: "disable"
+          log_level: "warn"
+          YAML
+          docker run -d --name qingdh-ci --network host \
+            -v "$PWD/config.ci.yml:/etc/qingdh/config.yml:ro" qingdh:ci
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080/readyz >/dev/null; then break; fi
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:8080/readyz
+          curl -sf http://127.0.0.1:8080/healthz
+          docker logs qingdh-ci
+          docker rm -f qingdh-ci
