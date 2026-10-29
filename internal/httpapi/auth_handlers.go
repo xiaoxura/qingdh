@@ -256,6 +256,78 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"expiresAt": *expiry})
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+// handleChangePassword is the logged-in self-service password change. The
+// current session survives; every other device is signed out.
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	user, ok := userFrom(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "请先登录")
+		return
+	}
+	if !s.limiter.allow("password:"+user.ID.String(), limitPasswordPerUser, burstPasswordPerUser) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "操作过于频繁，请稍后再试")
+		return
+	}
+
+	var req changePasswordRequest
+	if !decodeJSON(w, r, &req, maxAuthBodyBytes) {
+		return
+	}
+
+	verified, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
+	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
+		s.logger.Error("verify current password", "error", err, "user_id", user.ID.String())
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+	if !verified {
+		writeError(w, http.StatusForbidden, "invalid_password", "当前密码不正确")
+		return
+	}
+	if req.NewPassword == req.CurrentPassword {
+		writeError(w, http.StatusUnprocessableEntity, "same_password", "新密码不能与当前密码相同")
+		return
+	}
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "weak_password", err.Error())
+		return
+	}
+
+	hash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		if writePasswordBusy(w, err) {
+			return
+		}
+		s.logger.Error("hash new password", "error", err, "user_id", user.ID.String())
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+
+	current, _ := sessionFrom(r.Context())
+	if err := s.store.UpdatePasswordAndRevokeOtherSessions(r.Context(), user.ID, hash, current.ID); err != nil {
+		s.logger.Error("update password and revoke sessions", "error", err, "user_id", user.ID.String())
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+	s.audit(r.Context(), &user.ID, &user.ID, "account.password_change", map[string]any{"keptCurrentSession": true})
+
+	if s.settings.Get().SMTPConfigured() {
+		if sendErr := s.mailer.Send(r.Context(), mail.PasswordChangeNoticeMessage(user.Email)); sendErr != nil {
+			s.logger.Error("send password changed mail", "error", sendErr, "user_id", user.ID.String())
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
 type verifyRequest struct {
 	Token string `json:"token"`
 }

@@ -700,6 +700,7 @@
 
               <div class="account-actions">
                 <a class="btn" id="admin-link" href="/admin" hidden>管理后台</a>
+                <button class="btn" id="change-password" type="button">修改登录密码</button>
                 <button class="btn" id="logout-all" type="button">退出其他设备</button>
                 <button class="btn" id="logout" type="button">退出登录</button>
                 <button class="btn btn-quiet-danger" id="delete-account" type="button">删除账号</button>
@@ -1319,6 +1320,40 @@
       <div class="dialog-foot">
         <button class="btn" type="button" data-close-dialog>取消</button>
         <button class="btn btn-primary" id="reset-submit" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 修改登录密码 -->
+  <dialog id="change-password-dialog" aria-labelledby="change-password-title">
+    <form id="change-password-form" novalidate>
+      <div class="dialog-head">
+        <h2 id="change-password-title">修改登录密码</h2>
+        <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <p class="dialog-note">修改后其他设备会退出登录，当前浏览器保持登录。加密密码与登录密码相互独立，不会随之改变。</p>
+        <div class="field">
+          <label for="change-password-current">当前登录密码</label>
+          <input id="change-password-current" type="password" autocomplete="current-password" />
+        </div>
+        <div class="field">
+          <label for="change-password-new">新密码</label>
+          <input id="change-password-new" type="password" autocomplete="new-password" placeholder="至少 8 个字符" />
+        </div>
+        <div class="field">
+          <label for="change-password-new2">确认新密码</label>
+          <input id="change-password-new2" type="password" autocomplete="new-password" />
+        </div>
+        <p class="field-error" id="change-password-error" hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn" type="button" data-close-dialog>取消</button>
+        <button class="btn btn-primary" id="change-password-submit" type="submit">保存</button>
       </div>
     </form>
   </dialog>

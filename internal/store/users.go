@@ -114,6 +114,27 @@ func (s *Store) UpdatePasswordAndRevokeSessions(ctx context.Context, id uuid.UUI
 	})
 }
 
+// UpdatePasswordAndRevokeOtherSessions updates the password hash and removes
+// every session except keepID in one transaction. keepID is the caller's
+// current session, so a password change does not log the browser out.
+func (s *Store) UpdatePasswordAndRevokeOtherSessions(ctx context.Context, id uuid.UUID, hash string, keepID uuid.UUID) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, id, hash)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotFound
+		}
+		if keepID == uuid.Nil {
+			_, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, id)
+			return err
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1 AND id <> $2`, id, keepID)
+		return err
+	})
+}
+
 // DeleteUser removes the account; sessions, tokens and the document cascade.
 func (s *Store) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	tag, err := s.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)

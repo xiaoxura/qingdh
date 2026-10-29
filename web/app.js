@@ -411,9 +411,17 @@
     sessionsBlock: $('#sessions-block'),
     sessionsList: $('#sessions-list'),
     adminLink: $('#admin-link'),
+    changePasswordBtn: $('#change-password'),
     logoutAllBtn: $('#logout-all'),
     logoutBtn: $('#logout'),
     deleteAccountBtn: $('#delete-account'),
+    changePasswordDialog: $('#change-password-dialog'),
+    changePasswordForm: $('#change-password-form'),
+    changePasswordCurrent: $('#change-password-current'),
+    changePasswordNew: $('#change-password-new'),
+    changePasswordNew2: $('#change-password-new2'),
+    changePasswordError: $('#change-password-error'),
+    changePasswordSubmit: $('#change-password-submit'),
 
     mergeDialog: $('#merge-dialog'),
     mergeTitle: $('#merge-title'),
@@ -3434,6 +3442,73 @@
     showToast(apiError(response, '操作失败'));
   }
 
+  function openChangePasswordDialog() {
+    if (!sync.user) return;
+    dom.changePasswordForm.reset();
+    dom.changePasswordError.hidden = true;
+    dom.changePasswordSubmit.disabled = false;
+    dom.changePasswordDialog.showModal();
+    requestAnimationFrame(() => dom.changePasswordCurrent.focus());
+  }
+
+  async function handleChangePassword(event) {
+    event.preventDefault();
+    dom.changePasswordError.hidden = true;
+
+    const current = dom.changePasswordCurrent.value;
+    const next = dom.changePasswordNew.value;
+    const confirm = dom.changePasswordNew2.value;
+
+    if (!current) {
+      showAuthError(dom.changePasswordError, '请输入当前登录密码');
+      return;
+    }
+    if (next.length < 8) {
+      showAuthError(dom.changePasswordError, '新密码至少需要 8 个字符');
+      return;
+    }
+    if (next !== confirm) {
+      showAuthError(dom.changePasswordError, '两次输入的新密码不一致');
+      return;
+    }
+    if (next === current) {
+      showAuthError(dom.changePasswordError, '新密码不能与当前密码相同');
+      return;
+    }
+
+    dom.changePasswordSubmit.disabled = true;
+    const response = await api('/api/v1/auth/password', {
+      method: 'POST',
+      body: { currentPassword: current, newPassword: next },
+    });
+    dom.changePasswordSubmit.disabled = false;
+
+    if (response.ok) {
+      dom.changePasswordForm.reset();
+      dom.changePasswordDialog.close();
+      showToast('登录密码已修改，其他设备已退出登录');
+      loadSessions();
+      return;
+    }
+    if (response.status === 401) {
+      dom.changePasswordDialog.close();
+      await handleAuthLost();
+      return;
+    }
+    const code = response.data && response.data.error && response.data.error.code;
+    const message =
+      code === 'invalid_password'
+        ? '当前密码不正确'
+        : code === 'same_password'
+          ? '新密码不能与当前密码相同'
+          : code === 'weak_password'
+            ? apiError(response, '新密码不符合要求')
+            : code === 'rate_limited'
+              ? '操作过于频繁，请稍后再试'
+              : apiError(response, '修改失败，请稍后再试');
+    showAuthError(dom.changePasswordError, message);
+  }
+
   async function handleDeleteAccount(event) {
     event.preventDefault();
     dom.deleteError.hidden = true;
@@ -5795,6 +5870,8 @@
   }
   dom.logoutBtn.addEventListener('click', handleLogout);
   dom.logoutAllBtn.addEventListener('click', handleLogoutAll);
+  dom.changePasswordBtn.addEventListener('click', openChangePasswordDialog);
+  dom.changePasswordForm.addEventListener('submit', handleChangePassword);
   dom.deleteAccountBtn.addEventListener('click', () => {
     dom.deleteError.hidden = true;
     dom.deleteForm.reset();

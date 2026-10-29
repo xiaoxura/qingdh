@@ -87,6 +87,10 @@ const (
 	limitVerifyPerIP = 30.0
 	burstVerifyPerIP = 10
 
+	// 登录态改密：需要校验当前密码 + Argon2 重算，按用户而不是 IP 限流。
+	limitPasswordPerUser = 5.0
+	burstPasswordPerUser = 3
+
 	// Encrypted secret sync: memo autosave is debounced, but a burst of edits
 	// can still produce several writes per minute.
 	limitSecretPerUser = 120.0

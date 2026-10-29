@@ -199,6 +199,17 @@ func ResetMessage(base *url.URL, to, token string) Message {
 	return Message{To: to, Subject: "重置你的氢导航密码", Text: text, HTML: html}
 }
 
+// PasswordChangeNoticeMessage notifies the account owner after a logged-in
+// password change. Other devices were signed out, but this browser stays.
+func PasswordChangeNoticeMessage(to string) Message {
+	text := "你的氢导航登录密码刚刚被修改，其他设备已退出登录。\n\n如果这不是你本人的操作，请立即使用「忘记密码」重置账号密码。"
+	html := `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;font-size:15px;line-height:1.7;color:#1b1e24;max-width:520px">
+<p>你的氢导航登录密码刚刚被修改，其他设备已退出登录。</p>
+<p style="color:#6b7280;font-size:13px">如果这不是你本人的操作，请立即使用「忘记密码」重置账号密码。</p>
+</div>`
+	return Message{To: to, Subject: "氢导航登录密码已修改", Text: text, HTML: html}
+}
+
 // PasswordChangedMessage notifies the account owner after a reset.
 func PasswordChangedMessage(to string) Message {
 	text := "你的氢导航密码刚刚被重置，所有设备都已退出登录。\n\n如果这不是你本人的操作，请立即通过邮箱验证流程重新找回账号。"
