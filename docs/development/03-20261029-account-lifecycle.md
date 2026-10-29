@@ -376,7 +376,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | 工作项 | 状态 | 验证 | 备注 |
 | --- | --- | --- | --- |
 | B1 限额保留策略 | 已完成 | `node --test web-tests/unit/core.test.mjs`（含 51 组/501 链接、公平配额、墓碑优先） | `enforceLimits` 抽到 `web/lib/core.js` |
-| B2 自定义搜索引擎 | 待开始 | | |
+| B2 自定义搜索引擎 | 已完成 | `web-tests/reliability.mjs`（新增自定义引擎后可从菜单选中） | `selectEngine` 改用 `allEngines()` |
 | B3 自动同步开关 | 待开始 | | |
 | B4 对话框 resolver 并发 | 待开始 | | |
 | B5 Service Worker 导航缓存 | 待开始 | | |

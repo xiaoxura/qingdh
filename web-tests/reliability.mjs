@@ -76,6 +76,25 @@ async function main() {
   check('account and settings share one centered hub', hubInfo.open === true && hubInfo.tab === 'account', hub.value);
   await tab1.evaluate(`document.getElementById('hub-dialog').close(); true`);
 
+  // B2：自定义搜索引擎必须能从菜单里被选中并生效。
+  const customEngine = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="search"]').click(); await sleep(200);
+    document.getElementById('engine-add-open').click(); await sleep(200);
+    document.getElementById('engine-new-name').value='站内搜索';
+    document.getElementById('engine-new-bang').value='site';
+    document.getElementById('engine-new-url').value='https://example.com/search?q={query}';
+    document.getElementById('engine-add-btn').click();
+    await sleep(300);
+    document.getElementById('hub-dialog').close(); await sleep(150);
+    document.getElementById('engine-btn').click(); await sleep(150);
+    const option=[...document.querySelectorAll('#engine-menu [data-engine]')].find((node)=>node.textContent.includes('站内搜索'));
+    if(option) option.click();
+    await sleep(200);
+    return JSON.stringify({label:document.getElementById('engine-name').textContent, found:Boolean(option), selected:option?option.getAttribute('aria-selected'):null});})()`);
+  const customEngineInfo = JSON.parse(customEngine.value || '{}');
+  check('custom search engine can be selected from the menu', customEngineInfo.found === true && customEngineInfo.label === '站内搜索' && customEngineInfo.selected === 'true', customEngine.value);
+
   const avatar = await tab1.evaluate(`JSON.stringify((()=>{const m=document.getElementById('account-avatar-mini');return {text:m.textContent.trim(),art:!!m.querySelector('.avatar-art'),index:m.dataset.avatar};})())`);
   const avatarInfo = JSON.parse(avatar.value || '{}');
   check('account avatar comes from the DiceBear library', avatarInfo.text === '' && avatarInfo.art === true && /^\d+$/.test(avatarInfo.index || '') && Number(avatarInfo.index) < 24, avatar.value);

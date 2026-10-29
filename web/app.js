@@ -1569,7 +1569,8 @@
   }
 
   function selectEngine(id) {
-    if (!ENGINES.some((engine) => engine.id === id)) return;
+    // 菜单用 allEngines() 渲染，校验也必须覆盖自定义引擎，否则自定义项点击无效。
+    if (!allEngines().some((engine) => engine.id === id)) return;
     data.settings.engine = id;
     data.settings.updatedAt = now();
     commitLocalChange();
