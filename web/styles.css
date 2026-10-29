@@ -5632,3 +5632,34 @@ body.ai-results-open .sidebar-fab {
 .history-item.is-ai .history-main {
   gap: 3px;
 }
+
+/* 历史版本预览 */
+.revision-preview {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--field);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.revision-preview-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.revision-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.revision-chip {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 999px;
+}

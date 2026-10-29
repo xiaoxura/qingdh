@@ -445,6 +445,41 @@ async function main() {
   const tab3AfterInfo = JSON.parse(tab3After.value || '{}');
   check('A4 broadcast resets other tabs to plaintext', tab3BeforeInfo.enc === '已开启' && tab3AfterInfo.enc === '未开启' && tab3AfterInfo.unlock === false, `${tab3Before.value} -> ${tab3After.value}`);
 
+  // ---------- A5. server-side revision history: preview and restore ----------
+  const history = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    const closeAll=()=>{for(const d of document.querySelectorAll('dialog[open]')){if(d.id!=='hub-dialog'&&d.id!=='revisions-dialog'){try{d.close();}catch(error){}}}};
+    closeAll();
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="sync"]').click(); await sleep(200);
+    document.querySelector('[data-hub-subtab="data"]').click(); await sleep(200);
+    document.getElementById('revisions-btn').click();
+    for(let i=0;i<80;i++){await sleep(100);if(document.querySelectorAll('#revisions-list [data-revision-preview]').length>0)break;}
+    const entries=[...document.querySelectorAll('#revisions-list [data-revision-preview]')].map((node)=>node.dataset.revisionPreview);
+    const latest=entries[0];
+    document.querySelector('[data-revision-preview="'+latest+'"]').click();
+    for(let i=0;i<80;i++){await sleep(100);if(!document.getElementById('revision-preview').hidden)break;}
+    const previewTitle=document.getElementById('revision-preview-title').textContent;
+    const previewBody=document.getElementById('revision-preview-body').textContent;
+    const stateAfterPreview=document.getElementById('encryption-state').textContent;
+    document.querySelector('[data-revision-restore="'+latest+'"]').click();
+    for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('confirm-dialog').open)break;}
+    const confirmOpened=document.getElementById('confirm-dialog').open;
+    if(confirmOpened) document.getElementById('confirm-ok').click();
+    for(let i=0;i<100;i++){await sleep(100);if(document.getElementById('sync-badge').dataset.status==='synced')break;}
+    await sleep(800);
+    const workspace=await (await fetch('/api/v1/workspace')).json();
+    const snapshot=JSON.parse(localStorage.getItem('qingdh.backup.v1')||'null');
+    const entriesAfter=[...document.querySelectorAll('#revisions-list [data-revision-preview]')].map((node)=>node.dataset.revisionPreview);
+    document.getElementById('revisions-dialog').close();
+    document.getElementById('hub-dialog').close();
+    return JSON.stringify({entries, latest, confirmOpened, previewTitle, previewBody, stateAfterPreview,
+      revision:workspace.revision, version:workspace.payload && workspace.payload.version,
+      snapshotReason:snapshot && snapshot.reason, entriesAfter});})()`);
+  const historyInfo = JSON.parse(history.value || '{}');
+  check('A5 revision history lists every successful write', (historyInfo.entries || []).length >= 2 && (historyInfo.entries || []).includes('1'), history.value);
+  check('A5 revision preview renders the stored document', (historyInfo.previewBody || '').includes('个分组') && historyInfo.stateAfterPreview === '未开启', history.value);
+  check('A5 restore saves a snapshot and appends a new revision', historyInfo.confirmOpened === true && historyInfo.snapshotReason === 'before-restore' && historyInfo.version === 2 && Number(historyInfo.revision) >= 4 && (historyInfo.entriesAfter || []).length >= 3, history.value);
+
   const png = await tab1.send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(join(tmpdir(), 'qingdh-regression-final.png'), Buffer.from(png.data, 'base64'));
   const failures = checks.filter((c) => !c.ok);

@@ -483,8 +483,12 @@ func cleanupLoop(ctx context.Context, st *store.Store, logger *slog.Logger) {
 		if err != nil {
 			logger.Warn("cleanup audit failed", "error", err)
 		}
-		if sessions > 0 || tokens > 0 || aiUsage > 0 || audit > 0 {
-			logger.Info("cleanup", "sessions", sessions, "email_tokens", tokens, "ai_usage", aiUsage, "audit", audit)
+		revisions, err := st.PruneDocumentRevisions(runCtx, 20, 30*24*time.Hour)
+		if err != nil {
+			logger.Warn("cleanup document revisions failed", "error", err)
+		}
+		if sessions > 0 || tokens > 0 || aiUsage > 0 || audit > 0 || revisions > 0 {
+			logger.Info("cleanup", "sessions", sessions, "email_tokens", tokens, "ai_usage", aiUsage, "audit", audit, "document_revisions", revisions)
 		}
 	}
 

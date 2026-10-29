@@ -144,6 +144,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/account/export", s.requireAuth(s.handleExport))
 
 	mux.HandleFunc("GET /api/v1/workspace", s.requireAuth(s.handleGetWorkspace))
+	mux.HandleFunc("GET /api/v1/workspace/revisions", s.requireAuth(s.handleListWorkspaceRevisions))
+	mux.HandleFunc("GET /api/v1/workspace/revisions/{revision}", s.requireAuth(s.handleGetWorkspaceRevision))
 	mux.HandleFunc("PUT /api/v1/workspace", s.requireAuth(s.handlePutWorkspace))
 	mux.HandleFunc("POST /api/v1/workspace/disable-encryption", s.requireAuth(s.handleDisableEncryption))
 
