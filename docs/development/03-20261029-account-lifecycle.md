@@ -378,7 +378,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | B1 限额保留策略 | 已完成 | `node --test web-tests/unit/core.test.mjs`（含 51 组/501 链接、公平配额、墓碑优先） | `enforceLimits` 抽到 `web/lib/core.js` |
 | B2 自定义搜索引擎 | 已完成 | `web-tests/reliability.mjs`（新增自定义引擎后可从菜单选中） | `selectEngine` 改用 `allEngines()` |
 | B3 自动同步开关 | 已完成 | `core.test.mjs` 表驱动 + `reliability.mjs`（关闭后编辑保持 dirty，手动同步上传） | `syncNow` 统一判断，用户操作走 `manual: true` |
-| B4 对话框 resolver 并发 | 待开始 | | |
+| B4 对话框 resolver 并发 | 已完成 | `web-tests/unit/dialog.test.mjs`（重复调用结算旧值、不重复 showModal、可重开） | 新增 `web/lib/dialog.js`，解锁/导入解密/Passkey 统一使用 |
 | B5 Service Worker 导航缓存 | 待开始 | | |
 | B6 桌面侧栏 hidden 焦点 | 待开始 | | |
 | B7 会话续期失败降级 | 待开始 | | |

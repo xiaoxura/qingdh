@@ -477,13 +477,10 @@
     envelope: null,
     dataKeyRaw: null,
     pendingSetup: null,
-    unlockResolver: null,
-    fileDecryptResolver: null,
     fileDecryptEnvelope: null,
     vaultRemembered: false,
     vaultEnvelopeId: null,
     passkeyRegistered: false,
-    passkeyResolver: null,
   };
 
   const sync = {
@@ -516,6 +513,14 @@
   let clockFormatKey = '';
   let clockMinuteKey = '';
   let mobileQuery = null;
+
+  // 对话框的 Promise 生命周期统一交给 lib/dialog.js：重复触发时先结算旧值，
+  // 已打开的 dialog 不再重复 showModal()（B4）。
+  const dialogLib = globalThis.QingdhDialog;
+  if (!dialogLib) throw new Error('QingdhDialog is not loaded');
+  const unlockModal = dialogLib.createModal(dom.unlockDialog);
+  const decryptFileModal = dialogLib.createModal(dom.decryptFileDialog);
+  const passkeyModal = dialogLib.createModal(dom.passkeyDialog);
 
   /* ------------------------------------------------------------------ *
    * 小工具
@@ -2229,20 +2234,16 @@
         resolve(false);
         return;
       }
-      if (cryptoState.passkeyResolver) cryptoState.passkeyResolver(false);
-      cryptoState.passkeyResolver = resolve;
-      dom.passkeyError.hidden = true;
-      dom.passkeyVerify.disabled = false;
-      dom.passkeyDialog.showModal();
-      setTimeout(() => dom.passkeyVerify.focus(), 30);
+      passkeyModal.prompt(resolve, () => {
+        dom.passkeyError.hidden = true;
+        dom.passkeyVerify.disabled = false;
+        setTimeout(() => dom.passkeyVerify.focus(), 30);
+      });
     });
   }
 
   function resolvePasskey(value) {
-    const resolve = cryptoState.passkeyResolver;
-    cryptoState.passkeyResolver = null;
-    if (dom.passkeyDialog.open) dom.passkeyDialog.close();
-    if (resolve) resolve(value);
+    passkeyModal.settle(value);
   }
 
   async function submitPasskey() {
@@ -2384,10 +2385,7 @@
   }
 
   function resolveUnlock(value) {
-    const resolve = cryptoState.unlockResolver;
-    cryptoState.unlockResolver = null;
-    if (dom.unlockDialog.open) dom.unlockDialog.close();
-    if (resolve) resolve(value);
+    unlockModal.settle(value);
   }
 
   function promptUnlock(envelope) {
@@ -2397,22 +2395,22 @@
         resolve(null);
         return;
       }
-      cryptoState.unlockResolver = resolve;
-      dom.unlockMessage.textContent = sync.user
-        ? `账号 ${sync.user.email} 的云端数据已加密，请输入加密密码。`
-        : '云端数据已加密，请输入加密密码。';
-      dom.unlockPassword.value = '';
-      dom.unlockRecovery.value = '';
-      dom.unlockRecoveryToggle.checked = false;
-      dom.unlockRecoveryField.hidden = true;
-      dom.unlockRemember.checked = true;
-      const canRemember = Boolean(sync.user && vaultSupported());
-      dom.unlockRememberLine.hidden = !canRemember;
-      dom.unlockRememberNote.hidden = !canRemember;
-      dom.unlockError.hidden = true;
-      dom.unlockSubmit.disabled = false;
-      dom.unlockDialog.showModal();
-      setTimeout(() => dom.unlockPassword.focus(), 30);
+      unlockModal.prompt(resolve, () => {
+        dom.unlockMessage.textContent = sync.user
+          ? `账号 ${sync.user.email} 的云端数据已加密，请输入加密密码。`
+          : '云端数据已加密，请输入加密密码。';
+        dom.unlockPassword.value = '';
+        dom.unlockRecovery.value = '';
+        dom.unlockRecoveryToggle.checked = false;
+        dom.unlockRecoveryField.hidden = true;
+        dom.unlockRemember.checked = true;
+        const canRemember = Boolean(sync.user && vaultSupported());
+        dom.unlockRememberLine.hidden = !canRemember;
+        dom.unlockRememberNote.hidden = !canRemember;
+        dom.unlockError.hidden = true;
+        dom.unlockSubmit.disabled = false;
+        setTimeout(() => dom.unlockPassword.focus(), 30);
+      });
     });
   }
 
@@ -2872,24 +2870,20 @@
   }
 
   function resolveDecryptFile(value) {
-    const resolve = cryptoState.fileDecryptResolver;
-    cryptoState.fileDecryptResolver = null;
     cryptoState.fileDecryptEnvelope = null;
-    if (dom.decryptFileDialog.open) dom.decryptFileDialog.close();
-    if (resolve) resolve(value);
+    decryptFileModal.settle(value);
   }
 
   function promptDecryptFile(envelope) {
     return new Promise((resolve) => {
-      if (cryptoState.fileDecryptResolver) resolve(null);
-      cryptoState.fileDecryptResolver = resolve;
-      cryptoState.fileDecryptEnvelope = envelope;
-      dom.decryptFileForm.reset();
-      dom.decryptFileRecoveryField.hidden = true;
-      dom.decryptFileError.hidden = true;
-      dom.decryptFileSubmit.disabled = false;
-      dom.decryptFileDialog.showModal();
-      setTimeout(() => dom.decryptFilePassword.focus(), 30);
+      decryptFileModal.prompt(resolve, () => {
+        cryptoState.fileDecryptEnvelope = envelope;
+        dom.decryptFileForm.reset();
+        dom.decryptFileRecoveryField.hidden = true;
+        dom.decryptFileError.hidden = true;
+        dom.decryptFileSubmit.disabled = false;
+        setTimeout(() => dom.decryptFilePassword.focus(), 30);
+      });
     });
   }
 
@@ -5674,12 +5668,7 @@
   dom.passkeyRemove.addEventListener('click', removePasskey);
   dom.passkeyVerify.addEventListener('click', submitPasskey);
   dom.passkeyUsePassword.addEventListener('click', () => resolvePasskey(false));
-  dom.passkeyDialog.addEventListener('close', () => {
-    if (!cryptoState.passkeyResolver) return;
-    const resolve = cryptoState.passkeyResolver;
-    cryptoState.passkeyResolver = null;
-    resolve(false);
-  });
+  dom.passkeyDialog.addEventListener('close', () => passkeyModal.settle(false));
 
   dom.encryptionEnable.addEventListener('click', openEncryptDialog);
   dom.encryptionUnlock.addEventListener('click', unlockFromPanel);
@@ -5714,12 +5703,7 @@
     setTimeout(() => (recovery ? dom.unlockRecovery : dom.unlockPassword).focus(), 20);
   });
   dom.unlockLater.addEventListener('click', () => resolveUnlock(null));
-  dom.unlockDialog.addEventListener('close', () => {
-    const resolve = cryptoState.unlockResolver;
-    if (!resolve) return;
-    cryptoState.unlockResolver = null;
-    resolve(null);
-  });
+  dom.unlockDialog.addEventListener('close', () => unlockModal.settle(null));
 
   dom.decryptFileForm.addEventListener('submit', submitDecryptFile);
   dom.decryptFileRecoveryToggle.addEventListener('change', () => {
@@ -5729,13 +5713,7 @@
     setTimeout(() => (recovery ? dom.decryptFileRecovery : dom.decryptFilePassword).focus(), 20);
   });
   dom.decryptFileCancel.addEventListener('click', () => resolveDecryptFile(null));
-  dom.decryptFileDialog.addEventListener('close', () => {
-    if (!cryptoState.fileDecryptResolver) return;
-    const resolve = cryptoState.fileDecryptResolver;
-    cryptoState.fileDecryptResolver = null;
-    cryptoState.fileDecryptEnvelope = null;
-    resolve(null);
-  });
+  dom.decryptFileDialog.addEventListener('close', () => resolveDecryptFile(null));
 
   dom.exportBtn.addEventListener('click', exportData);
   dom.importBtn.addEventListener('click', () => dom.importFile.click());
