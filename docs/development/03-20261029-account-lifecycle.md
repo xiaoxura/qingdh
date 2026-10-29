@@ -389,7 +389,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | A5 服务端版本历史 | 已完成 | 迁移 0010；`TestWorkspaceRevisions*`（成功写入才记录、409/跨用户、v3 保留、20 份/30 天、级联删除、8 并发仅 1 成功）+ `TestWorkspaceConcurrentPutsUseSingleRevision`；`reliability.mjs` 预览/恢复/快照；加密历史预览手工验证 | 新增 `/workspace/revisions` 两个只读接口；恢复复用 PUT，不新增恢复接口 |
 | A6 审计日志后台 | 已完成 | 迁移 0011；`TestAdminAudit*`（403、分页/动作/操作者筛选、删除管理员后 actor_email 保留、不泄露密文/密码/Key） | 新增 `GET /admin/audit` 与后台「审计」分类 |
 | A7 发布收口 | 已完成（本地范围） | `qingdh version` = v0.1.0；linux/amd64 + arm64 静态构建成功；管理后台显示 `serverVersion`；README 增加升级/回滚；迁移 0009–0011 在空库与已有库顺序执行 | 按任务约束未添加 release workflow、未打 tag、未推送镜像/远端 |
-| C1 拆分 app.js | 待开始 | | |
-| C2 补测试 | 待开始 | | |
-| C3 同步效率 | 待开始 | | |
-| C4 首屏瘦身 | 待开始 | | |
+| C1 拆分 app.js | 部分完成 | 新增 `lib/dialog.js`、`lib/store.js`、`lib/render.js`、`lib/data.js`、`lib/sw-policy.js`，均有 `node:test`；app.js 从 6.3k 行降到约 6.8k（新增 A1–A6 UI），settings/sync/account 拆分留待下一轮 | 第一刀边界已建立，行为由全量回归覆盖 |
+| C2 补测试 | 已完成 | `web-tests/unit/*.test.mjs` 37 项（crypto/rewrap/AAD、limits、dialog、store、render、data、sw-policy、focus 节流）；Go 版本并发、`/auth/refresh`、`/auth/sessions`、`/auth/logout-all`、`/account/export` 成功路径 | |
+| C3 同步效率 | 已完成 | `TestWorkspaceConditionalGet`/`TestSecretConditionalGet`/`TestSiteConditionalGet`；focus 30s 节流单测；memo 1.6s/5s；site Logo 基于 settings version 的 ETag | workspace/secrets/site 支持 304；reconcile 单飞 |
+| C4 首屏瘦身 | 已完成（第一步） | 可选模块按首次使用加载，SW 不再预缓存可选模块；首屏 gzip 152.8 KiB → 98.1 KiB（同一口径，含 HTML/CSS/核心 JS） | 对话框 `<template>` 化未做，记入后续 |

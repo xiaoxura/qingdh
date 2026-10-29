@@ -14,7 +14,9 @@
   const MAX_TITLE = 80;
   const MAX_TAGS = 8;
   const MAX_TAG = 20;
-  const SAVE_DEBOUNCE = 500;
+  // 空闲 1.6s 合并保存；持续输入时最多等 5s 就必须落一次盘。
+  const SAVE_DEBOUNCE = 1600;
+  const SAVE_MAX_WAIT = 5000;
   const TOMBSTONE_TTL = 30 * 24 * 60 * 60 * 1000;
   const CHANNEL_NAME = 'qingdh-memo';
   const NOTIFIED_KEY = 'qingdh.memo.notified.v1';
@@ -55,6 +57,7 @@
     saving: false,
     pending: false,
     saveTimer: null,
+    saveDeadline: 0,
     syncState: 'idle',
     mode: '',
     readingPane: false,
@@ -1006,9 +1009,18 @@
 
   function scheduleSave(delay = SAVE_DEBOUNCE) {
     clearTimeout(state.saveTimer);
+    let wait = delay;
+    if (delay === SAVE_DEBOUNCE) {
+      const current = deps.now();
+      if (!state.saveDeadline) state.saveDeadline = current + SAVE_MAX_WAIT;
+      wait = Math.max(0, Math.min(delay, state.saveDeadline - current));
+    } else {
+      state.saveDeadline = 0;
+    }
     state.saveTimer = setTimeout(() => {
+      state.saveDeadline = 0;
       saveNow().catch(() => {});
-    }, delay);
+    }, wait);
   }
 
   // 关闭/切走页面时把防抖窗口内的编辑立即提交，避免“界面显示已保存、
@@ -1016,6 +1028,7 @@
   function flushPendingSave() {
     if (!state.loaded || !state.dirty) return Promise.resolve();
     clearTimeout(state.saveTimer);
+    state.saveDeadline = 0;
     return saveNow(0, { autoRetry: false, keepalive: true }).catch(() => {});
   }
 
@@ -1028,6 +1041,7 @@
 
     const epoch = state.epoch;
     const local = state.mode === 'local';
+    state.saveDeadline = 0;
     state.saving = true;
     state.pending = false;
     state.dirty = false;

@@ -153,7 +153,9 @@ async function main() {
   check('account avatar comes from the DiceBear library', avatarInfo.text === '' && avatarInfo.art === true && /^\d+$/.test(avatarInfo.index || '') && Number(avatarInfo.index) < 24, avatar.value);
 
   const engineIcon = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
-    document.getElementById('ai-mode-btn').click(); await sleep(180);
+    document.getElementById('ai-mode-btn').click();
+    for(let i=0;i<80;i++){await sleep(100);if(globalThis.QingdhAI)break;}
+    await sleep(400);
     const option=document.querySelector('[data-web-engine="baidu"]');
     if(option) option.click();
     await sleep(1200);
@@ -283,7 +285,9 @@ async function main() {
   const privacy = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
     document.getElementById('settings-btn').click(); await sleep(400);
     document.querySelector('[data-hub-tab="privacy"]').click(); await sleep(250);
-    document.querySelector('[data-hub-subtab="privacy-space"]').click(); await sleep(250);
+    document.querySelector('[data-hub-subtab="privacy-space"]').click();
+    for(let i=0;i<80;i++){await sleep(100);if(globalThis.QingdhPrivacy)break;}
+    await sleep(250);
     document.getElementById('privacy-open-settings').click();
     for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('privacy-lock-dialog').open)break;}
     document.getElementById('privacy-password').value='privacy-regression-1';
@@ -327,13 +331,15 @@ async function main() {
 
   // ---------- H2. memo flush, list update and search ----------
   const memo = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
-    document.getElementById('memo-nav').click(); await sleep(700);
+    document.getElementById('memo-nav').click();
+    for(let i=0;i<80;i++){await sleep(100);if(globalThis.QingdhMemo)break;}
+    await sleep(700);
     document.getElementById('memo-new').click(); await sleep(200);
     const title=document.getElementById('memo-title');
     const body=document.getElementById('memo-body');
     title.value='Hot memo'; title.dispatchEvent(new Event('input',{bubbles:true}));
     body.value='first line\\nsecond line'; body.dispatchEvent(new Event('input',{bubbles:true}));
-    await sleep(900);
+    await sleep(2200);
     const before=QingdhSecrets.getCached('memo');
     body.value += '\\nflush-tail';
     body.dispatchEvent(new Event('input',{bubbles:true}));

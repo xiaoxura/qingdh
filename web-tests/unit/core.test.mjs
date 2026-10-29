@@ -47,6 +47,13 @@ test('timestamp helpers reject non-positive values', () => {
   assert.equal(core.toTombstone('5'), 5);
 });
 
+test('C3 focus-driven sync is throttled but the first focus still runs', () => {
+  assert.equal(core.focusSyncAllowed(0, 10_000), true);
+  assert.equal(core.focusSyncAllowed(10_000, 39_999), false);
+  assert.equal(core.focusSyncAllowed(10_000, 40_000), true);
+  assert.equal(core.focusSyncAllowed(10_000, 20_000, 5_000), true);
+});
+
 test('B3 auto sync switch only blocks event-driven syncs', () => {
   assert.equal(core.autoSyncAllowed({ autoSync: true }), true);
   assert.equal(core.autoSyncAllowed({ autoSync: false }), false);

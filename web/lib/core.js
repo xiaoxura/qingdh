@@ -200,6 +200,12 @@
     return manual === true || !prefs || prefs.autoSync !== false;
   }
 
+  // 聚焦/可见性触发的自动同步节流：默认 30 秒内只拉一次，手动同步不受影响。
+  function focusSyncAllowed(lastAt, currentAt, intervalMs = 30000) {
+    if (!lastAt) return true;
+    return Number(currentAt) - Number(lastAt) >= intervalMs;
+  }
+
   // Favicons go through the same-origin proxy, so a homepage with many links
   // does not leak the whole bookmark list to each third-party site.
   function faviconOf(url) {
@@ -224,6 +230,7 @@
     hostOf,
     faviconOf,
     autoSyncAllowed,
+    focusSyncAllowed,
     fairQuotas,
     enforceLimits,
   };

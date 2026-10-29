@@ -8,7 +8,7 @@
 'use strict';
 
 // 每次发布前端资源时递增版本号；新版本安装后等待用户确认再接管。
-const VERSION = '20261029-39';
+const VERSION = '20261029-43';
 const CACHE_NAME = `qingdh-shell-${VERSION}`;
 
 // 导航缓存判定单独成模块，便于 node:test 覆盖（B5）。
@@ -22,19 +22,15 @@ const SHELL_PATHS = [
   '/memo-batch.css',
   '/select.css',
   '/lib/core.js',
+  '/lib/store.js',
+  '/lib/render.js',
+  '/lib/data.js',
   '/lib/dialog.js',
   '/lib/sw-policy.js',
   '/select.js',
   '/crypto.js',
   '/device-vault.js',
   '/secrets.js',
-  '/memo.js',
-  '/ai.js',
-  '/privacy.js',
-  '/command-palette.js',
-  '/bookmarks.js',
-  '/pwa.js',
-  '/passkey.js',
   '/avatars.js',
   '/app.js',
   '/manifest.webmanifest',

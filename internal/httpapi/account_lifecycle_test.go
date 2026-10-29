@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -342,5 +343,59 @@ func TestEmailChangeTokenExpiryReuseAndOverwrite(t *testing.T) {
 	}
 	if expired := c.confirmEmailChange(expiring); !strings.Contains(expired.header.Get("Location"), "email_change=expired") {
 		t.Fatalf("expired token should be invalid, got %q", expired.header.Get("Location"))
+	}
+}
+
+func TestRefreshSessionsListAndLogoutAll(t *testing.T) {
+	env := newEnv(t, nil)
+	current := env.client(t)
+	registerVerified(t, env, current, "sessions@example.com", "correct horse battery")
+
+	if resp := current.do(http.MethodPost, "/api/v1/auth/refresh", ""); resp.status != http.StatusOK || !strings.Contains(resp.body, "expiresAt") {
+		t.Fatalf("refresh = %d %s", resp.status, resp.body)
+	}
+
+	list := current.do(http.MethodGet, "/api/v1/auth/sessions", "")
+	if list.status != http.StatusOK || !strings.Contains(list.body, `"current":true`) {
+		t.Fatalf("sessions = %d %s", list.status, list.body)
+	}
+
+	other := env.client(t)
+	if resp := other.login("sessions@example.com", "correct horse battery"); resp.status != http.StatusOK {
+		t.Fatalf("second login = %d %s", resp.status, resp.body)
+	}
+	list = current.do(http.MethodGet, "/api/v1/auth/sessions", "")
+	var sessions struct {
+		Sessions []struct {
+			ID      string `json:"id"`
+			Current bool   `json:"current"`
+		} `json:"sessions"`
+	}
+	if err := json.Unmarshal([]byte(list.body), &sessions); err != nil {
+		t.Fatalf("decode sessions: %v", err)
+	}
+	if len(sessions.Sessions) != 2 {
+		t.Fatalf("expected two sessions, got %d", len(sessions.Sessions))
+	}
+
+	if resp := current.do(http.MethodPost, "/api/v1/auth/logout-all", ""); resp.status != http.StatusOK {
+		t.Fatalf("logout-all = %d %s", resp.status, resp.body)
+	}
+	if resp := other.do(http.MethodGet, "/api/v1/auth/me", ""); resp.status != http.StatusUnauthorized {
+		t.Fatalf("other session after logout-all = %d %s", resp.status, resp.body)
+	}
+	if resp := current.do(http.MethodGet, "/api/v1/auth/me", ""); resp.status != http.StatusOK {
+		t.Fatalf("current session after logout-all = %d %s", resp.status, resp.body)
+	}
+
+	export := current.do(http.MethodGet, "/api/v1/account/export", "")
+	if export.status != http.StatusOK || !strings.Contains(export.header.Get("Content-Disposition"), "attachment") {
+		t.Fatalf("export = %d %s", export.status, export.body)
+	}
+	var payload struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal([]byte(export.body), &payload); err != nil || payload.Version != 2 {
+		t.Fatalf("export payload = %s (err %v)", export.body, err)
 	}
 }

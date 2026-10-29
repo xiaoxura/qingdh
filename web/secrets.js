@@ -73,8 +73,12 @@
     const existing = cache.get(kind);
     if (existing && !force) return existing.plain;
 
-    const response = await deps.api(`/api/v1/secrets/${kind}`);
+    // 用本地 revision 作为 If-None-Match；命中 304 时直接复用缓存，避免
+    // 每次打开备忘录/AI 都整包下载密文。
+    const etag = existing ? `"s-${kind}-${existing.revision}"` : null;
+    const response = await deps.api(`/api/v1/secrets/${kind}`, { etag });
     if (requestEpoch !== currentEpoch(kind)) throw fail('stale', '账号已切换');
+    if (response.status === 304 && existing) return existing.plain;
     if (response.status === 401) {
       deps.onAuthLost();
       throw fail('auth', '登录已过期');

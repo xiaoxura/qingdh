@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/XiaoXuRa/qingdh/internal/auth"
@@ -21,6 +22,12 @@ func (s *Server) handleGetWorkspace(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			// Should not happen: registration creates the document.
+			etag := workspaceETag(0)
+			w.Header().Set("ETag", etag)
+			if etagMatches(r.Header.Get("If-None-Match"), etag) {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
 			writeJSON(w, http.StatusOK, workspaceDTO{
 				Revision:  0,
 				Payload:   json.RawMessage(`{"version":2,"settings":{},"groups":[]}`),
@@ -30,6 +37,13 @@ func (s *Server) handleGetWorkspace(w http.ResponseWriter, r *http.Request) {
 		}
 		s.logger.Error("get workspace", "error", err, "user_id", user.ID.String())
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+
+	etag := workspaceETag(doc.Revision)
+	w.Header().Set("ETag", etag)
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 
@@ -225,6 +239,10 @@ func (s *Server) handleDisableEncryption(w http.ResponseWriter, r *http.Request)
 		"revision":  doc.Revision,
 		"updatedAt": doc.UpdatedAt,
 	})
+}
+
+func workspaceETag(revision int64) string {
+	return fmt.Sprintf(`"w-%d"`, revision)
 }
 
 func payloadVersion(raw json.RawMessage) int {

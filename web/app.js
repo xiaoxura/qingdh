@@ -12,6 +12,22 @@
   if (!core) throw new Error('QingdhCore is not loaded');
   const { escapeHTML, uid, toTimestamp, toTombstone, normalizeUrl, isURL, hostOf, faviconOf } = core;
 
+  const storeLib = globalThis.QingdhStore;
+  const renderLib = globalThis.QingdhRender;
+  if (!storeLib || !renderLib) throw new Error('QingdhStore/QingdhRender is not loaded');
+
+  const storage = storeLib.createStorage({
+    storage: (() => {
+      try {
+        return globalThis.localStorage;
+      } catch (error) {
+        return null;
+      }
+    })(),
+    onError: () => showToast('保存失败：浏览器本地存储不可用或已满'),
+  });
+  const { readJSON, writeJSON, removeKey, readFlag, writeFlag } = storage;
+
   /* ------------------------------------------------------------------ *
    * 常量
    * ------------------------------------------------------------------ */
@@ -105,29 +121,23 @@
     },
   ];
 
-  function normalizeCustomEngines(raw) {
-    if (!Array.isArray(raw)) return [];
-    const ids = new Set(ENGINES.map((engine) => engine.id));
-    const bangs = new Set(ENGINES.map((engine) => engine.bang));
-    const out = [];
-    for (const item of raw.slice(0, 20)) {
-      if (!item || typeof item !== 'object') continue;
-      const name = String(item.name || '').trim().slice(0, 20);
-      const template = String(item.template || '').trim().slice(0, 500);
-      if (!name || !template.includes('{query}') || !/^https?:\/\//i.test(template)) continue;
-      let id = typeof item.id === 'string' && /^[a-z0-9-]{3,50}$/i.test(item.id) ? item.id : `c-${uid()}`;
-      if (ids.has(id)) id = `c-${uid()}`;
-      ids.add(id);
-      let bang = String(item.bang || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '')
-        .slice(0, 8);
-      if (bang && bangs.has(bang)) bang = '';
-      if (bang) bangs.add(bang);
-      out.push({ id, name, template, bang });
-    }
-    return out;
-  }
+  const dataModel = globalThis.QingdhData.createDataModel({
+    uid,
+    toTimestamp,
+    toTombstone,
+    normalizeUrl,
+    engines: ENGINES,
+    now,
+  });
+  const {
+    makeLink,
+    makeGroup,
+    createDefaultData,
+    normalizeLink,
+    normalizeData,
+    countLinks,
+    countGroups,
+  } = dataModel;
 
   function allEngines() {
     const custom = data && data.settings && Array.isArray(data.settings.customEngines)
@@ -213,6 +223,7 @@
     searchInput: $('#search-input'),
     engine: $('#engine'),
     engineBtn: $('#engine-btn'),
+    aiModeBtn: $('#ai-mode-btn'),
     engineName: $('#engine-name'),
     engineMenu: $('#engine-menu'),
 
@@ -545,6 +556,8 @@
     status: 'guest',
     inFlight: false,
     timer: null,
+    lastAutoSyncAt: 0,
+    encrypted: false,
     online: navigator.onLine !== false,
     // 编辑代次与会话代次：用于避免“请求成功时覆盖请求期间的新编辑”和
     // “账号切换后旧请求回写状态”。
@@ -587,35 +600,6 @@
     return JSON.parse(JSON.stringify(value));
   }
 
-  function readJSON(key) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function writeJSON(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      showToast('保存失败：浏览器本地存储不可用或已满');
-      console.warn('保存失败', error);
-      return false;
-    }
-  }
-
-  function removeKey(key) {
-    try {
-      localStorage.removeItem(key);
-    } catch (error) {
-      // ignore
-    }
-  }
-
   function hueOf(value) {
     let hash = 0;
     for (const char of String(value)) {
@@ -655,147 +639,9 @@
    * 数据模型（payload v2）
    * ------------------------------------------------------------------ */
 
-  function makeLink(title, url, icon = '') {
-    const stamp = now();
-    return { id: uid(), title, url, icon, updatedAt: stamp, deletedAt: null };
-  }
-
-  function makeGroup(name, links = []) {
-    return { id: uid(), name, links, updatedAt: now(), deletedAt: null };
-  }
-
-  function createDefaultData() {
-    return {
-      version: 2,
-      settings: { name: '', engine: 'bing', customEngines: [], engineOrder: [], updatedAt: now() },
-      groups: [
-        makeGroup('常用', [
-          makeLink('GitHub', 'https://github.com'),
-          makeLink('哔哩哔哩', 'https://www.bilibili.com'),
-          makeLink('知乎', 'https://www.zhihu.com'),
-          makeLink('少数派', 'https://sspai.com'),
-        ]),
-        makeGroup('开发', [
-          makeLink('MDN Web Docs', 'https://developer.mozilla.org/zh-CN/'),
-          makeLink('Stack Overflow', 'https://stackoverflow.com'),
-          makeLink('npm', 'https://www.npmjs.com'),
-          makeLink('Vercel', 'https://vercel.com'),
-        ]),
-        makeGroup('工具', [
-          makeLink('DeepL 翻译', 'https://www.deepl.com/translator'),
-          makeLink('TinyPNG', 'https://tinypng.com'),
-          makeLink('Excalidraw', 'https://excalidraw.com'),
-          makeLink('草料二维码', 'https://cli.im'),
-        ]),
-      ],
-    };
-  }
-
-  function normalizeLink(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-
-    const deletedAt = toTombstone(raw.deletedAt);
-    const url = deletedAt ? String(raw.url || '') : normalizeUrl(raw.url, { allowShortHost: true });
-    if (!deletedAt && !url) return null;
-
-    return {
-      id: typeof raw.id === 'string' && raw.id ? raw.id : uid(),
-      title: typeof raw.title === 'string' ? raw.title.slice(0, 40) : '',
-      url,
-      icon: typeof raw.icon === 'string' ? raw.icon.slice(0, 200) : '',
-      updatedAt: toTimestamp(raw.updatedAt),
-      deletedAt,
-    };
-  }
-
-  function normalizeData(input) {
-    const raw = input && typeof input === 'object' ? input : {};
-    const rawSettings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
-    const customEngines = normalizeCustomEngines(rawSettings.customEngines);
-    const knownEngines = [...ENGINES, ...customEngines];
-
-    const settings = {
-      name: typeof rawSettings.name === 'string' ? rawSettings.name.trim().slice(0, 12) : '',
-      engine: knownEngines.some((engine) => engine.id === rawSettings.engine)
-        ? rawSettings.engine
-        : 'bing',
-      customEngines,
-      engineOrder: Array.isArray(rawSettings.engineOrder)
-        ? rawSettings.engineOrder
-            .filter((id) => typeof id === 'string' && knownEngines.some((engine) => engine.id === id))
-            .slice(0, 50)
-        : [],
-      updatedAt: toTimestamp(rawSettings.updatedAt),
-    };
-
-    const seenGroups = new Set();
-    const seenLinks = new Set();
-
-    const groups = (Array.isArray(raw.groups) ? raw.groups : [])
-      .filter((group) => group && typeof group === 'object')
-      .map((group) => {
-        let id = typeof group.id === 'string' && group.id ? group.id : uid();
-        if (seenGroups.has(id)) id = uid();
-        seenGroups.add(id);
-
-        const links = (Array.isArray(group.links) ? group.links : [])
-          .map(normalizeLink)
-          .filter(Boolean)
-          .map((link) => {
-            if (seenLinks.has(link.id)) return { ...link, id: uid() };
-            seenLinks.add(link.id);
-            return link;
-          });
-
-        return {
-          id,
-          name:
-            typeof group.name === 'string' && group.name.trim()
-              ? group.name.trim().slice(0, 20)
-              : '未命名分组',
-          links,
-          updatedAt: toTimestamp(group.updatedAt),
-          deletedAt: toTombstone(group.deletedAt),
-        };
-      });
-
-    const doc = { version: 2, settings, groups };
-    pruneTombstones(doc);
-    return doc;
-  }
-
-  const TOMBSTONE_TTL = 30 * 24 * 60 * 60 * 1000;
-
-  // 墓碑保留 30 天：超过后从本地文档里移除，避免数据无限增长。
-  function pruneTombstones(doc) {
-    const cutoff = Date.now() - TOMBSTONE_TTL;
-    doc.groups = doc.groups.filter(
-      (group) => !(group.deletedAt && group.deletedAt < cutoff)
-    );
-    doc.groups.forEach((group) => {
-      group.links = group.links.filter(
-        (link) => !(link.deletedAt && link.deletedAt < cutoff)
-      );
-    });
-    return doc;
-  }
-
   // 限额逻辑是纯函数，放在 lib/core.js 里做表驱动测试；这里只绑定本应用的限额。
   function enforceLimits(doc) {
     return core.enforceLimits(doc, { maxGroups: MAX_GROUPS, maxLinks: MAX_LINKS });
-  }
-
-  function countLinks(doc) {
-    if (!doc || !Array.isArray(doc.groups)) return 0;
-    return doc.groups.reduce((total, group) => {
-      if (group.deletedAt) return total;
-      return total + (Array.isArray(group.links) ? group.links.filter((l) => !l.deletedAt).length : 0);
-    }, 0);
-  }
-
-  function countGroups(doc) {
-    if (!doc || !Array.isArray(doc.groups)) return 0;
-    return doc.groups.filter((group) => !group.deletedAt).length;
   }
 
   function stampAll(doc) {
@@ -827,20 +673,11 @@
   }
 
   function readGuestDirty() {
-    try {
-      return localStorage.getItem(GUEST_DIRTY_KEY) === '1';
-    } catch (error) {
-      return false;
-    }
+    return readFlag(GUEST_DIRTY_KEY);
   }
 
   function writeGuestDirty(value) {
-    try {
-      if (value) localStorage.setItem(GUEST_DIRTY_KEY, '1');
-      else localStorage.removeItem(GUEST_DIRTY_KEY);
-    } catch (error) {
-      // ignore
-    }
+    writeFlag(GUEST_DIRTY_KEY, value);
   }
 
   function writeSyncMeta() {
@@ -849,6 +686,7 @@
       revision: sync.revision,
       lastSyncedAt: sync.lastSyncedAt,
       dirty: sync.dirty,
+      encrypted: Boolean(sync.encrypted),
     });
   }
 
@@ -989,90 +827,17 @@
     }
   }
 
-  function renderIcon(link) {
-    const icon = (link.icon || '').trim();
-    const hue = hueOf(hostOf(link.url) || link.title || link.url);
-    const glyph = escapeHTML(glyphOf(link));
-
-    if (icon && !/^https?:\/\//i.test(icon)) {
-      return `<span class="glyph glyph--icon" style="--h:${hue}" aria-hidden="true">${escapeHTML(icon)}</span>`;
-    }
-
-    // 首字母色块始终先渲染，图标加载成功后再覆盖，避免慢速/失败请求留下空白方块。
-    const source = icon || faviconOf(link.url);
-    // 服务端代理不可出网时退回浏览器直连；正常情况下仍由同源代理缓存，
-    // 不会把整份书签列表直接暴露给每个站点。
-    const fallback = icon ? '' : directFaviconOf(link.url);
-    const baseline = `<span class="glyph" style="--h:${hue}" aria-hidden="true">${glyph}</span>`;
-    if (!source) return baseline;
-
-    return `${baseline}<img class="favicon" src="${escapeHTML(source)}" data-fallback="${escapeHTML(
-      fallback
-    )}" alt="" loading="lazy" referrerpolicy="no-referrer" />`;
-  }
-
-  function renderLink(link) {
-    if (link.deletedAt) return '';
-    const label = link.title || hostOf(link.url) || '未命名';
-    const target = prefs.openInNewTab ? ' target="_blank" rel="noopener noreferrer"' : '';
-
-    const batch = state.batchMode;
-    const batchChecked = batch && state.batchSelected.has(link.id);
-    return `<div class="link-row${batchChecked ? ' is-batch-selected' : ''}" data-batch-row="${escapeHTML(
-      link.id
-    )}">
-      ${
-        batch
-          ? `<label class="batch-check"><input type="checkbox" data-batch-toggle="${escapeHTML(
-              link.id
-            )}" ${batchChecked ? 'checked' : ''} aria-label="选择 ${escapeHTML(label)}" /></label>`
-          : ''
-      }
-      <a class="link" href="${escapeHTML(link.url)}"${target} data-link-id="${escapeHTML(link.id)}" title="${escapeHTML(link.url)}">
-        <span class="link-icon">${renderIcon(link)}</span>
-        <span class="link-title">${escapeHTML(label)}</span>
-      </a>
-      <button class="link-remove" type="button" data-action="delete-link" data-link-id="${escapeHTML(link.id)}" aria-label="删除 ${escapeHTML(label)}" title="删除">
-        ${ICON_X}
-      </button>
-    </div>`;
-  }
-
-  function renderGroup(group) {
-    if (group.deletedAt) return '';
-    const titleAttrs = state.editing ? ' role="button" tabindex="0" title="点击重命名分组"' : '';
-    const actions = state.editing
-      ? `<div class="group-actions">
-          <button class="mini-btn" type="button" data-action="add-link" data-group-id="${escapeHTML(group.id)}" aria-label="在「${escapeHTML(group.name)}」中添加" title="添加">${ICON_PLUS}</button>
-          <button class="mini-btn" type="button" data-action="delete-group" data-group-id="${escapeHTML(group.id)}" aria-label="删除分组「${escapeHTML(group.name)}」" title="删除分组">${ICON_X}</button>
-        </div>`
-      : '';
-
-    const visibleLinks = group.links.filter((link) => !link.deletedAt);
-    const links = visibleLinks.length
-      ? group.links.map(renderLink).join('')
-      : '<p class="group-empty">暂无链接</p>';
-    const collapsed = !state.editing && Boolean(prefs.collapsedGroups[group.id]);
-
-    return `<section class="group${collapsed ? ' is-collapsed' : ''}" data-group-id="${escapeHTML(
-      group.id
-    )}">
-      <div class="group-head">
-        <div class="group-title-wrap">
-          <button class="mini-btn group-toggle" type="button" data-action="toggle-group" data-group-id="${escapeHTML(
-            group.id
-          )}" aria-expanded="${String(!collapsed)}" title="${collapsed ? '展开分组' : '收起分组'}" aria-label="${
-            collapsed ? '展开' : '收起'
-          }「${escapeHTML(group.name)}」">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${collapsed ? 'm9 6 6 6-6 6' : 'm6 9 6 6 6-6'}"/></svg>
-          </button>
-          <h2 class="group-title"${titleAttrs}>${escapeHTML(group.name)}</h2>
-        </div>
-        ${actions}
-      </div>
-      <div class="links">${links}</div>
-    </section>`;
-  }
+  const renderer = renderLib.createRenderer({
+    escapeHTML,
+    hostOf,
+    faviconOf,
+    hueOf,
+    glyphOf,
+    directFaviconOf,
+    icons: { plus: ICON_PLUS, x: ICON_X },
+    getPrefs: () => prefs,
+    getState: () => state,
+  });
 
   function hydrateIcons() {
     $$('img.favicon', dom.groups).forEach((img) => {
@@ -1106,10 +871,9 @@
   }
 
   function render() {
-    const visibleGroups = data.groups.filter((group) => !group.deletedAt);
-    dom.groups.innerHTML = visibleGroups.length
-      ? visibleGroups.map(renderGroup).join('')
-      : '<p class="empty">还没有快捷方式，点击下方按钮添加一个吧</p>';
+    dom.groups.innerHTML =
+      renderer.renderGroups(data.groups) ||
+      '<p class="empty">还没有快捷方式，点击下方按钮添加一个吧</p>';
 
     dom.addGroupBtn.hidden = !state.editing;
     hydrateIcons();
@@ -2034,7 +1798,7 @@
     return location.protocol === 'http:' || location.protocol === 'https:';
   }
 
-  async function api(path, { method = 'GET', body = null, keepalive = false } = {}) {
+  async function api(path, { method = 'GET', body = null, keepalive = false, etag = null } = {}) {
     const options = {
       method,
       credentials: 'same-origin',
@@ -2042,6 +1806,7 @@
       cache: 'no-store',
     };
     if (keepalive) options.keepalive = true;
+    if (etag) options.headers['If-None-Match'] = etag;
     if (body !== null) {
       options.headers['Content-Type'] = 'application/json';
       options.body = JSON.stringify(body);
@@ -2058,7 +1823,13 @@
           payload = null;
         }
       }
-      return { status: response.status, ok: response.ok, data: payload, networkError: false };
+      return {
+        status: response.status,
+        ok: response.ok || response.status === 304,
+        notModified: response.status === 304,
+        data: payload,
+        networkError: false,
+      };
     } catch (error) {
       return { status: 0, ok: false, data: null, networkError: true };
     }
@@ -2501,11 +2272,13 @@
       cryptoState.unlocked = false;
       cryptoState.envelope = null;
       cryptoState.dataKeyRaw = null;
+      sync.encrypted = false;
       updateEncryptionUI();
       return payload;
     }
 
     cryptoState.enabled = true;
+    sync.encrypted = true;
     cryptoState.envelope = payload;
     cryptoState.unlocked = false;
     updateEncryptionUI();
@@ -2754,6 +2527,7 @@
       sync.lastSyncedAt = now();
       cryptoState.enabled = true;
       cryptoState.unlocked = true;
+      sync.encrypted = true;
       cryptoState.envelope = pending.envelope;
       cryptoState.dataKeyRaw = pending.dataKeyRaw;
       cryptoState.pendingSetup = null;
@@ -3013,6 +2787,7 @@
       QingdhPasskey.remove(userId).catch(() => {});
     }
     resetCryptoState();
+    sync.encrypted = false;
     sync.revision = revision;
     sync.dirty = false;
     sync.hasLocal = true;
@@ -3603,6 +3378,7 @@
     sync.revision = meta && Number.isFinite(meta.revision) ? meta.revision : null;
     sync.lastSyncedAt = meta && meta.lastSyncedAt ? meta.lastSyncedAt : null;
     sync.dirty = Boolean(meta && meta.dirty);
+    sync.encrypted = Boolean(meta && meta.encrypted);
     sync.hasLocal = Boolean(stored);
 
     if (stored) {
@@ -3643,6 +3419,7 @@
     sync.revision = null;
     sync.cloudData = null;
     sync.dirty = false;
+    sync.encrypted = false;
     sync.hasLocal = false;
     sync.lastSyncedAt = null;
 
@@ -4161,13 +3938,39 @@
     }, delay);
   }
 
-  async function reconcile() {
-    if (!sync.user) return;
+  function workspaceETag(revision) {
+    return revision == null ? null : `"w-${revision}"`;
+  }
 
+  // 加密账号在新标签页必须先拿到 envelope 才能解锁；只有已经知道文档是
+  // 明文，或当前标签页已有 envelope 时，才允许用 revision 走 304。
+  function workspacePullETag() {
+    if (sync.revision == null) return null;
+    if (sync.encrypted && !cryptoState.envelope) return null;
+    return workspaceETag(sync.revision);
+  }
+
+  async function reconcile() {
+    if (!sync.user || sync.inFlight) return;
+
+    sync.inFlight = true;
+    updateSyncUI();
     const sessionSeq = sync.sessionSeq;
     setStatus('syncing');
-    const response = await api('/api/v1/workspace');
-    if (sessionSeq !== sync.sessionSeq) return;
+    try {
+      const response = await api('/api/v1/workspace', { etag: workspacePullETag() });
+      if (sessionSeq !== sync.sessionSeq) return;
+
+      if (response.status === 304) {
+        if (sync.dirty) {
+          await pushWithRetries(sync.revision);
+          return;
+        }
+        sync.lastSyncedAt = now();
+        writeSyncMeta();
+        setStatus('synced');
+        return;
+      }
 
     if (response.status === 401) {
       await handleAuthLost();
@@ -4180,11 +3983,11 @@
 
     const revision = response.data.revision;
 
-    if (revision === 0) {
-      sync.revision = 0;
-      await pushWithRetries(0);
-      return;
-    }
+      if (revision === 0) {
+        sync.revision = 0;
+        await pushWithRetries(0);
+        return;
+      }
 
     // 有本地未推送修改时，冲突处理需要原始 envelope 自己解码一次；
     // 先解码再把明文传进去会触发“未加密”分支，破坏加密状态。
@@ -4222,8 +4025,12 @@
       return;
     }
 
-    writeSyncMeta();
-    setStatus('synced');
+      writeSyncMeta();
+      setStatus('synced');
+    } finally {
+      sync.inFlight = false;
+      updateSyncUI();
+    }
   }
 
   async function pushWorkspace(baseRevision) {
@@ -4400,8 +4207,14 @@
       }
 
       setStatus('syncing');
-      const response = await api('/api/v1/workspace');
+      const response = await api('/api/v1/workspace', { etag: workspacePullETag() });
       if (sessionSeq !== sync.sessionSeq) return;
+      if (response.status === 304) {
+        sync.lastSyncedAt = now();
+        writeSyncMeta();
+        setStatus('synced');
+        return;
+      }
       if (response.status === 401) {
         await handleAuthLost();
         return;
@@ -5275,14 +5088,18 @@
       updateAccountUI();
     } else {
       syncSettingsUI();
-      if (activePanel === 'privacy-space' && globalThis.QingdhPrivacy) QingdhPrivacy.refreshSettings();
-      if (activePanel === 'usage' && globalThis.QingdhAI) QingdhAI.openUsage();
+      if (activePanel === 'device') withOptionalModule('QingdhPasskey', () => refreshPasskeyUI());
+      if (activePanel === 'privacy-space') withOptionalModule('QingdhPrivacy', () => QingdhPrivacy.refreshSettings());
+      if (activePanel === 'usage') withOptionalModule('QingdhAI', () => QingdhAI.openUsage());
       if (activePanel === 'sync') renderSyncManager();
-      if (activePanel === 'ai' && aiEligible && globalThis.QingdhAI && QingdhAI.prepareConfig) {
-        QingdhAI.prepareConfig().catch((error) => {
-          if (!dom.aiConfigError) return;
-          dom.aiConfigError.textContent = (error && error.message) || '读取 AI 配置失败';
-          dom.aiConfigError.hidden = false;
+      if (activePanel === 'ai' && aiEligible) {
+        withOptionalModule('QingdhAI', () => {
+          if (!QingdhAI.prepareConfig) return;
+          QingdhAI.prepareConfig().catch((error) => {
+            if (!dom.aiConfigError) return;
+            dom.aiConfigError.textContent = (error && error.message) || '读取 AI 配置失败';
+            dom.aiConfigError.hidden = false;
+          });
         });
       }
     }
@@ -5311,7 +5128,7 @@
     if (!sync.user) setAuthView('login');
     else {
       refreshVaultState();
-      refreshPasskeyUI();
+      withOptionalModule('QingdhPasskey', () => refreshPasskeyUI());
     }
     openHub('account');
   }
@@ -6365,7 +6182,7 @@
   dom.bookmarksFile.addEventListener('change', () => {
     const file = dom.bookmarksFile.files && dom.bookmarksFile.files[0];
     dom.bookmarksFile.value = '';
-    importBookmarks(file);
+    if (file) withOptionalModule('QingdhBookmarks', () => importBookmarks(file));
   });
   if (dom.bookmarkImportOk) dom.bookmarkImportOk.addEventListener('click', applyBookmarkImport);
   if (dom.bookmarkImportDialog) {
@@ -6505,12 +6322,44 @@
     });
   });
 
+  function shortcutMatches(event, shortcut) {
+    const parts = String(shortcut || '')
+      .split('+')
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean);
+    const key = parts.pop();
+    if (!key) return false;
+    const needAlt = parts.includes('alt');
+    const needCtrl = parts.includes('ctrl') || parts.includes('control');
+    const needMeta = parts.includes('meta') || parts.includes('cmd');
+    const needShift = parts.includes('shift');
+    return (
+      event.altKey === needAlt &&
+      event.ctrlKey === needCtrl &&
+      event.metaKey === needMeta &&
+      event.shiftKey === needShift &&
+      String(event.key).toLowerCase() === key
+    );
+  }
+
   document.addEventListener('keydown', (event) => {
     const target = event.target;
     const isTyping = isTypingTarget(target);
 
     // 隐私空间打开时，普通快捷键不生效，避免把搜索框等焦点抢到遮罩后面。
     if (globalThis.QingdhPrivacy && QingdhPrivacy.isOpen()) return;
+
+    // 隐私模块按需加载：快捷键先于模块初始化时由这里接管一次。
+    if (
+      !globalThis.QingdhPrivacy &&
+      !isTyping &&
+      !isDialogOpen() &&
+      shortcutMatches(event, prefs.privacyShortcut)
+    ) {
+      event.preventDefault();
+      withOptionalModule('QingdhPrivacy', () => QingdhPrivacy.requestOpen());
+      return;
+    }
 
     if (state.drawerOpen && !isDialogOpen()) {
       if (event.key === 'Escape') {
@@ -6578,10 +6427,18 @@
     if (prefs.theme === 'auto') applyTheme();
   });
 
+  function autoSyncFromFocus() {
+    if (!sync.user || sync.inFlight || sync.status === 'auth') return;
+    if (!core.focusSyncAllowed(sync.lastAutoSyncAt, now())) return;
+    sync.lastAutoSyncAt = now();
+    syncNow();
+  }
+
   window.addEventListener('online', () => {
     sync.online = true;
     if (sync.user) {
       setStatus(sync.dirty ? 'dirty' : 'syncing');
+      sync.lastAutoSyncAt = now();
       syncNow();
     }
   });
@@ -6596,14 +6453,10 @@
       restartClock();
       if (globalThis.QingdhMemo) QingdhMemo.checkReminders();
     }
-    if (document.visibilityState === 'visible' && sync.user && !sync.inFlight && sync.status !== 'auth') {
-      syncNow();
-    }
+    if (document.visibilityState === 'visible') autoSyncFromFocus();
   });
 
-  window.addEventListener('focus', () => {
-    if (sync.user && !sync.inFlight && sync.status !== 'auth') syncNow();
-  });
+  window.addEventListener('focus', autoSyncFromFocus);
 
   /* ------------------------------------------------------------------ *
    * 启动
@@ -6684,39 +6537,50 @@
     });
   }
 
-  // 首屏只需要 core + app；备忘录、AI、隐私、命令面板等按需加载，避免在
-  // 手机上为从不打开的页面解析数百 KiB JS。脚本注入仍走同源 classic script。
-  const OPTIONAL_SCRIPTS = ['memo.js', 'ai.js', 'privacy.js', 'command-palette.js', 'passkey.js', 'avatars.js'];
-  let optionalModulesPromise = null;
-  let optionalModulesWired = false;
+  // 首屏只需要 core + app（以及头像、选择器等轻量基础脚本）。备忘录、
+  // AI、隐私、命令面板、Passkey 在首次使用时按单个文件加载，避免为从不
+  // 打开的页面解析数十 KiB JS；脚本注入仍走同源 classic script。
+  const OPTIONAL_MODULES = {
+    QingdhMemo: 'memo.js',
+    QingdhAI: 'ai.js',
+    QingdhPrivacy: 'privacy.js',
+    QingdhCommandPalette: 'command-palette.js',
+    QingdhPasskey: 'passkey.js',
+    QingdhBookmarks: 'bookmarks.js',
+    QingdhPWA: 'pwa.js',
+  };
+  const modulePromises = new Map();
+  const wiredModules = new Set();
 
-  function loadOptionalModules() {
-    if (optionalModulesPromise) return optionalModulesPromise;
-    optionalModulesPromise = Promise.all(
-      OPTIONAL_SCRIPTS.map(
-        (name) =>
-          new Promise((resolve) => {
-            const script = document.createElement('script');
-            script.src = ASSET_VERSION ? `${name}?v=${ASSET_VERSION}` : name;
-            script.defer = true;
-            script.onload = () => resolve(true);
-            script.onerror = () => {
-              console.warn('加载前端模块失败', name);
-              resolve(false);
-            };
-            document.head.appendChild(script);
-          })
-      )
-    );
-    return optionalModulesPromise;
+  function loadOptionalModule(name) {
+    if (modulePromises.has(name)) return modulePromises.get(name);
+    const file = OPTIONAL_MODULES[name];
+    const promise = new Promise((resolve) => {
+      if (!file) {
+        resolve(false);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = ASSET_VERSION ? `${file}?v=${ASSET_VERSION}` : file;
+      script.defer = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        console.warn('加载前端模块失败', file);
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    });
+    modulePromises.set(name, promise);
+    return promise;
   }
 
   function withOptionalModule(name, action) {
     if (globalThis[name]) {
+      wireOptionalModules();
       action();
       return;
     }
-    loadOptionalModules().then(() => {
+    loadOptionalModule(name).then(() => {
       wireOptionalModules();
       if (globalThis[name]) action();
     });
@@ -6767,17 +6631,32 @@
     setupChannel();
     handleUrlFlags();
 
-    // Start fetching optional modules immediately; the first render above is
-    // already interactive while they download and parse.
-    const modules = loadOptionalModules();
+    // AI 按钮在首屏可见，但模块只在悬停/聚焦/点击时加载；点击路径先加载
+    // 再重放一次 click，让 ai.js 自己注册的处理逻辑接管。
+    const preloadAI = () => withOptionalModule('QingdhAI', () => {});
+    if (dom.aiModeBtn) {
+      dom.aiModeBtn.addEventListener('pointerenter', preloadAI, { once: true });
+      dom.aiModeBtn.addEventListener('focus', preloadAI, { once: true });
+      dom.aiModeBtn.addEventListener('click', (event) => {
+        if (globalThis.QingdhAI) return;
+        event.preventDefault();
+        event.stopPropagation();
+        loadOptionalModule('QingdhAI').then(() => {
+          wireOptionalModules();
+          if (globalThis.QingdhAI) dom.aiModeBtn.click();
+        });
+      });
+    }
+
+    wireOptionalModules();
 
     await initAccount();
     updateSnapshotButton();
-    await modules;
-    wireOptionalModules();
     updateAccountUI();
     updateDeviceUI();
-    if (globalThis.QingdhAI) QingdhAI.restoreRoute();
+    if (location.pathname === '/ai' || location.pathname === '/ai/') {
+      withOptionalModule('QingdhAI', () => QingdhAI.restoreRoute());
+    }
 
     if (state.openLoginAfterInit) {
       state.openLoginAfterInit = false;
@@ -6786,9 +6665,8 @@
   }
 
   function wireOptionalModules() {
-    if (optionalModulesWired) return;
-    optionalModulesWired = true;
-    if (globalThis.QingdhMemo) {
+    if (globalThis.QingdhMemo && !wiredModules.has('QingdhMemo')) {
+    wiredModules.add('QingdhMemo');
     QingdhMemo.init({
       escapeHTML,
       uid,
@@ -6815,7 +6693,8 @@
     });
   }
 
-  if (globalThis.QingdhAI) {
+  if (globalThis.QingdhAI && !wiredModules.has('QingdhAI')) {
+    wiredModules.add('QingdhAI');
     QingdhAI.init({
       toast: showToast,
       openAccountDialog,
@@ -6855,7 +6734,8 @@
     });
   }
 
-  if (globalThis.QingdhCommandPalette) {
+  if (globalThis.QingdhCommandPalette && !wiredModules.has('QingdhCommandPalette')) {
+    wiredModules.add('QingdhCommandPalette');
     QingdhCommandPalette.init({
       escapeHTML,
       engineName: () => currentEngine().name,
@@ -6864,23 +6744,16 @@
         recordSearch(query, currentEngine());
         navigate(engineBuild(currentEngine())(query));
       },
-      askAI: async (query) => {
-        if (!globalThis.QingdhAI) return;
-        if (!QingdhAI.isActive()) await QingdhAI.activate();
-        QingdhAI.openAsk(query);
+      askAI: (query) => {
+        withOptionalModule('QingdhAI', async () => {
+          if (!QingdhAI.isActive()) await QingdhAI.activate();
+          QingdhAI.openAsk(query);
+        });
       },
-      newMemo: () => {
-        if (globalThis.QingdhMemo) QingdhMemo.openAndCreate();
-      },
-      openMemo: () => {
-        if (globalThis.QingdhMemo) QingdhMemo.open();
-      },
-      openMemoById: (id) => {
-        if (globalThis.QingdhMemo) QingdhMemo.openById(id);
-      },
-      openPrivacy: () => {
-        if (globalThis.QingdhPrivacy) QingdhPrivacy.requestOpen();
-      },
+      newMemo: () => withOptionalModule('QingdhMemo', () => QingdhMemo.openAndCreate()),
+      openMemo: () => withOptionalModule('QingdhMemo', () => QingdhMemo.open()),
+      openMemoById: (id) => withOptionalModule('QingdhMemo', () => QingdhMemo.openById(id)),
+      openPrivacy: () => withOptionalModule('QingdhPrivacy', () => QingdhPrivacy.requestOpen()),
       openSettings,
       openAIConfig,
       openAccount: openAccountDialog,
@@ -6904,7 +6777,8 @@
     });
   }
 
-  if (globalThis.QingdhPrivacy) {
+  if (globalThis.QingdhPrivacy && !wiredModules.has('QingdhPrivacy')) {
+    wiredModules.add('QingdhPrivacy');
     QingdhPrivacy.init({
       api,
       toast: showToast,
@@ -6940,8 +6814,13 @@
     });
   }
 
-  if (globalThis.QingdhPWA) {
-    QingdhPWA.init({ toast: showToast });
+  function startPWA() {
+    withOptionalModule('QingdhPWA', () => QingdhPWA.init({ toast: showToast }));
+  }
+  if (document.readyState === 'complete') {
+    setTimeout(startPWA, 1200);
+  } else {
+    window.addEventListener('load', () => setTimeout(startPWA, 1200), { once: true });
   }
 
   init();

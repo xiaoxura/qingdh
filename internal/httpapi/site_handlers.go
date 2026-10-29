@@ -1,6 +1,10 @@
 package httpapi
 
-import "net/http"
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
 
 type siteInfoDTO struct {
 	Name string `json:"name"`
@@ -9,12 +13,20 @@ type siteInfoDTO struct {
 
 // handleSiteInfo exposes only public branding. It never exposes SMTP, session,
 // registration or other administrative settings.
-func (s *Server) handleSiteInfo(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleSiteInfo(w http.ResponseWriter, r *http.Request) {
 	values := s.settings.Get()
 	name := values.SiteName
 	if name == "" {
 		name = "氢导航"
 	}
-	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, siteInfoDTO{Name: name, Logo: values.SiteLogo})
+	etag := fmt.Sprintf(`"site-%d"`, values.Version)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(siteInfoDTO{Name: name, Logo: values.SiteLogo})
 }

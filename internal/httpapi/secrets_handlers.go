@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -41,6 +42,13 @@ func (s *Server) handleGetSecret(w http.ResponseWriter, r *http.Request) {
 		}
 		s.logger.Error("get secret", "error", err, "user_id", user.ID.String(), "kind", kind)
 		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+
+	etag := secretETag(kind, secret.Revision)
+	w.Header().Set("ETag", etag)
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 
@@ -142,6 +150,10 @@ func (s *Server) handleDeleteSecret(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "deleted"})
+}
+
+func secretETag(kind string, revision int64) string {
+	return fmt.Sprintf(`"s-%s-%d"`, kind, revision)
 }
 
 // writeSecretConflict returns 409 together with the current ciphertext so the
