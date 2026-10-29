@@ -200,14 +200,49 @@ async function main() {
     document.getElementById('encrypt-password2').value='regression-encryption-1';
     document.getElementById('encrypt-form').requestSubmit();
     for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('recovery-dialog').open)break;}
+    const firstCode=document.getElementById('recovery-code').textContent.replace(/\\s/g,'');
     document.getElementById('recovery-confirm').checked=true;
     document.getElementById('recovery-confirm').dispatchEvent(new Event('change'));
     document.getElementById('recovery-continue').click();
     for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('encryption-state').textContent==='已开启')break;}
     await sleep(500);
     document.getElementById('hub-dialog').close();
-    return document.getElementById('encryption-state').textContent;})()`);
-  check('account encryption enabled', encrypt.value === '已开启', encrypt.value || encrypt.error);
+    return JSON.stringify({state:document.getElementById('encryption-state').textContent, code:firstCode});})()`);
+  const encryptInfo = JSON.parse(encrypt.value || '{}');
+  check('account encryption enabled', encryptInfo.state === '已开启' && (encryptInfo.code || '').length === 40, encrypt.value || encrypt.error);
+
+  // A3：重新生成恢复码后旧码失效、新码可解锁、数据不变。
+  const rotate = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    const oldCode=${JSON.stringify(encryptInfo.code || '')};
+    const before=await (await fetch('/api/v1/workspace')).json();
+    const oldOpened=await QingdhCrypto.unlockWithRecovery(before.payload, oldCode);
+    document.getElementById('settings-btn').click(); await sleep(300);
+    document.querySelector('[data-hub-tab="privacy"]').click(); await sleep(200);
+    document.querySelector('[data-hub-subtab="encryption"]').click(); await sleep(200);
+    document.getElementById('encryption-recovery').click(); await sleep(200);
+    document.getElementById('rotate-recovery-password').value='definitely-wrong';
+    document.getElementById('rotate-recovery-form').requestSubmit(); await sleep(400);
+    const wrongRejected=!document.getElementById('rotate-recovery-error').hidden;
+    document.getElementById('rotate-recovery-password').value='regression-encryption-1';
+    document.getElementById('rotate-recovery-form').requestSubmit();
+    for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('new-recovery-dialog').open)break;}
+    const newCode=document.getElementById('new-recovery-code').textContent.replace(/\\s/g,'');
+    document.getElementById('new-recovery-confirm').checked=true;
+    document.getElementById('new-recovery-confirm').dispatchEvent(new Event('change'));
+    document.getElementById('new-recovery-save').click();
+    for(let i=0;i<80;i++){await sleep(100);if(!document.getElementById('new-recovery-dialog').open)break;}
+    await sleep(500);
+    const after=await (await fetch('/api/v1/workspace')).json();
+    let oldFails=false;
+    try { await QingdhCrypto.unlockWithRecovery(after.payload, oldCode); } catch (error) { oldFails=true; }
+    const newOpened=await QingdhCrypto.unlockWithRecovery(after.payload, newCode);
+    const sameData=JSON.stringify(newOpened.payload)===JSON.stringify(oldOpened.payload);
+    document.getElementById('hub-dialog').close();
+    return JSON.stringify({wrongRejected, newCodeLength:newCode.length, oldFails, dataSame:sameData,
+      recoveryChanged:before.payload.recovery && after.payload.recovery && before.payload.recovery.wrappedKey!==after.payload.recovery.wrappedKey,
+      version:after.payload.version});})()`);
+  const rotateInfo = JSON.parse(rotate.value || '{}');
+  check('A3 recovery rotation keeps data and invalidates the old code', rotateInfo.wrongRejected === true && rotateInfo.newCodeLength === 40 && rotateInfo.oldFails === true && rotateInfo.dataSame === true && rotateInfo.recoveryChanged === true && rotateInfo.version === 3, rotate.value);
 
   await tab1.evaluate(addLink('Base', 'https://example.com/base'));
   await sleep(1500);

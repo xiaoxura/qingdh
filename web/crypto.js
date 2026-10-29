@@ -277,6 +277,23 @@
     });
   }
 
+  // 重新生成恢复码：只替换 envelope.recovery.wrappedKey，salt/wrappedKey/
+  // check/data 保持不变，因此 Device Vault 和已加密数据都不受影响。
+  // options.useRecovery 为 true 时第一个参数传旧恢复码而不是密码。
+  async function rewrapRecovery(envelope, password, options = {}) {
+    assertEnvelope(envelope);
+    const dataKeyRaw = options.useRecovery
+      ? await unwrapRecovery(envelope, password)
+      : await unwrapPassword(envelope, password);
+    const recoveryCode = generateRecoveryCode();
+    const recoveryKey = await deriveRecoveryKey(recoveryCode);
+    const wrappedKey = await encryptRaw(recoveryKey, dataKeyRaw, AAD.recovery);
+    return {
+      recoveryCode,
+      envelope: Object.assign({}, envelope, { recovery: { wrappedKey } }),
+    };
+  }
+
   async function rewrapWithRecovery(envelope, code, newPassword) {
     if (typeof newPassword !== 'string' || newPassword.length < 8) {
       throw fail('weak_password', '加密密码至少 8 位');
@@ -524,6 +541,7 @@
     seal,
     rewrap,
     rewrapWithRecovery,
+    rewrapRecovery,
     sealSecret,
     openSecret,
     setupPrivacy,

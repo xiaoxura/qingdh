@@ -924,6 +924,7 @@
                 <button class="btn btn-small" id="encryption-enable" type="button">开启加密</button>
                 <button class="btn btn-small" id="encryption-unlock" type="button" hidden>解锁</button>
                 <button class="btn btn-small" id="encryption-change" type="button" hidden>修改密码</button>
+                <button class="btn btn-small" id="encryption-recovery" type="button" hidden>重新生成恢复码</button>
               </div>
             </div>
             <p class="field-hint">加密密钥只保存在本机与云端密文中；忘记密码时需要使用开启加密时保存的恢复码。</p>
@@ -1206,6 +1207,56 @@
         <button class="btn btn-primary" id="unlock-submit" type="submit">解锁</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- 重新生成恢复码：验证当前密码 -->
+  <dialog id="rotate-recovery-dialog" aria-labelledby="rotate-recovery-title">
+    <form id="rotate-recovery-form" novalidate>
+      <div class="dialog-head">
+        <h2 id="rotate-recovery-title">重新生成恢复码</h2>
+        <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <p class="dialog-note">输入当前加密密码后，会生成一个新的恢复码。上传成功后旧恢复码立即失效；加密密码和已保存的链接不受影响。</p>
+        <div class="field">
+          <label for="rotate-recovery-password">当前加密密码</label>
+          <input id="rotate-recovery-password" type="password" autocomplete="current-password" />
+        </div>
+        <p class="field-error" id="rotate-recovery-error" hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn" type="button" data-close-dialog>取消</button>
+        <button class="btn btn-primary" id="rotate-recovery-submit" type="submit">生成新恢复码</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 展示新的恢复码 -->
+  <dialog id="new-recovery-dialog" aria-labelledby="new-recovery-title">
+    <div class="dialog-head">
+      <h2 id="new-recovery-title">保存新的恢复码</h2>
+    </div>
+    <div class="dialog-body">
+      <p class="confirm-message">新恢复码只显示这一次。点击“保存并上传”后旧恢复码立即失效。</p>
+      <code class="recovery-code" id="new-recovery-code"></code>
+      <div class="recovery-actions">
+        <button class="btn btn-small" id="new-recovery-copy" type="button">复制</button>
+        <button class="btn btn-small" id="new-recovery-download" type="button">下载 .txt</button>
+      </div>
+      <label class="checkbox-line">
+        <input type="checkbox" id="new-recovery-confirm" />
+        <span>我已把新恢复码保存在离线、安全的地方</span>
+      </label>
+      <p class="field-error" id="new-recovery-error" hidden></p>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn" type="button" data-close-dialog>取消</button>
+      <button class="btn btn-primary" id="new-recovery-save" type="button">保存并上传</button>
+    </div>
   </dialog>
 
   <!-- 修改加密密码 -->

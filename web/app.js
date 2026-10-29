@@ -351,6 +351,7 @@
     encryptionEnable: $('#encryption-enable'),
     encryptionUnlock: $('#encryption-unlock'),
     encryptionChange: $('#encryption-change'),
+    encryptionRecovery: $('#encryption-recovery'),
     encryptDialog: $('#encrypt-dialog'),
     encryptForm: $('#encrypt-form'),
     encryptPassword: $('#encrypt-password'),
@@ -388,6 +389,18 @@
     passkeyError: $('#passkey-error'),
     passkeyVerify: $('#passkey-verify'),
     passkeyUsePassword: $('#passkey-use-password'),
+    rotateRecoveryDialog: $('#rotate-recovery-dialog'),
+    rotateRecoveryForm: $('#rotate-recovery-form'),
+    rotateRecoveryPassword: $('#rotate-recovery-password'),
+    rotateRecoveryError: $('#rotate-recovery-error'),
+    rotateRecoverySubmit: $('#rotate-recovery-submit'),
+    newRecoveryDialog: $('#new-recovery-dialog'),
+    newRecoveryCode: $('#new-recovery-code'),
+    newRecoveryConfirm: $('#new-recovery-confirm'),
+    newRecoveryError: $('#new-recovery-error'),
+    newRecoverySave: $('#new-recovery-save'),
+    newRecoveryCopy: $('#new-recovery-copy'),
+    newRecoveryDownload: $('#new-recovery-download'),
     changeEncryptionDialog: $('#change-encryption-dialog'),
     changeEncryptionForm: $('#change-encryption-form'),
     changeEncryptionOld: $('#change-encryption-old'),
@@ -494,6 +507,7 @@
     envelope: null,
     dataKeyRaw: null,
     pendingSetup: null,
+    pendingRecovery: null,
     fileDecryptEnvelope: null,
     vaultRemembered: false,
     vaultEnvelopeId: null,
@@ -2082,6 +2096,7 @@
     cryptoState.envelope = null;
     cryptoState.dataKeyRaw = null;
     cryptoState.pendingSetup = null;
+    cryptoState.pendingRecovery = null;
     cryptoState.vaultRemembered = false;
     cryptoState.vaultEnvelopeId = null;
     if (globalThis.QingdhSecrets) QingdhSecrets.forget();
@@ -2396,6 +2411,7 @@
     dom.encryptionEnable.hidden = enabled;
     dom.encryptionUnlock.hidden = !(enabled && !cryptoState.unlocked);
     dom.encryptionChange.hidden = !(enabled && cryptoState.envelope);
+    dom.encryptionRecovery.hidden = !(enabled && cryptoState.envelope);
 
     if (!enabled) {
       dom.encryptionHint.textContent = '开启后云端只保存密文，管理员也需要密码才能查看。';
@@ -2935,6 +2951,130 @@
       dom.decryptFileError.hidden = false;
       dom.decryptFileSubmit.disabled = false;
     }
+  }
+
+  function openRotateRecoveryDialog() {
+    if (!cryptoState.enabled || !cryptoState.envelope) return;
+    dom.rotateRecoveryForm.reset();
+    dom.rotateRecoveryError.hidden = true;
+    dom.rotateRecoverySubmit.disabled = false;
+    dom.rotateRecoveryDialog.showModal();
+    requestAnimationFrame(() => dom.rotateRecoveryPassword.focus());
+  }
+
+  async function submitRotateRecovery(event) {
+    event.preventDefault();
+    dom.rotateRecoveryError.hidden = true;
+    const password = dom.rotateRecoveryPassword.value;
+    if (!password) {
+      dom.rotateRecoveryError.textContent = '请输入当前加密密码';
+      dom.rotateRecoveryError.hidden = false;
+      return;
+    }
+    if (!cryptoState.envelope) {
+      dom.rotateRecoveryError.textContent = '请先完成一次同步，获取云端加密数据';
+      dom.rotateRecoveryError.hidden = false;
+      return;
+    }
+
+    dom.rotateRecoverySubmit.disabled = true;
+    try {
+      const rotated = await QingdhCrypto.rewrapRecovery(cryptoState.envelope, password);
+      cryptoState.pendingRecovery = rotated;
+      dom.rotateRecoveryForm.reset();
+      dom.rotateRecoveryDialog.close();
+      dom.newRecoveryCode.textContent = QingdhCrypto.formatRecoveryCode(rotated.recoveryCode);
+      dom.newRecoveryConfirm.checked = false;
+      dom.newRecoveryError.hidden = true;
+      dom.newRecoverySave.disabled = false;
+      dom.newRecoveryDialog.showModal();
+    } catch (error) {
+      dom.rotateRecoveryError.textContent = error && error.code === 'unlock_failed'
+        ? '加密密码不正确'
+        : (error && error.message) || '生成新恢复码失败';
+      dom.rotateRecoveryError.hidden = false;
+    } finally {
+      dom.rotateRecoverySubmit.disabled = false;
+    }
+  }
+
+  async function finishRotateRecovery() {
+    const pending = cryptoState.pendingRecovery;
+    if (!pending) return;
+    if (!dom.newRecoveryConfirm.checked) {
+      dom.newRecoveryError.textContent = '请先勾选“我已把新恢复码保存在离线、安全的地方”';
+      dom.newRecoveryError.hidden = false;
+      dom.newRecoveryConfirm.focus();
+      return;
+    }
+
+    dom.newRecoverySave.disabled = true;
+    dom.newRecoveryError.hidden = true;
+    try {
+      const response = await putWorkspacePayload(pending.envelope, sync.revision == null ? 0 : sync.revision);
+      if (response.status === 401) {
+        await handleAuthLost();
+        return;
+      }
+      if (response.status === 409) {
+        dom.newRecoveryError.textContent = '云端已在其他地方更新，请同步后重新生成';
+        dom.newRecoveryError.hidden = false;
+        return;
+      }
+      if (!response.ok) {
+        dom.newRecoveryError.textContent = apiError(response, '保存失败');
+        dom.newRecoveryError.hidden = false;
+        return;
+      }
+      sync.revision = response.data.revision;
+      sync.lastSyncedAt = now();
+      cryptoState.envelope = pending.envelope;
+      cryptoState.pendingRecovery = null;
+      writeSyncMeta();
+      updateEncryptionUI();
+      dom.newRecoveryDialog.close();
+      showToast('恢复码已更新，旧恢复码已失效');
+    } catch (error) {
+      dom.newRecoveryError.textContent = (error && error.message) || '保存失败';
+      dom.newRecoveryError.hidden = false;
+    } finally {
+      dom.newRecoverySave.disabled = false;
+    }
+  }
+
+  function copyNewRecoveryCode() {
+    const code = dom.newRecoveryCode.textContent;
+    if (!code) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(
+        () => showToast('恢复码已复制'),
+        () => showToast('复制失败，请手动选择')
+      );
+    } else {
+      showToast('请手动选择恢复码复制');
+    }
+  }
+
+  function downloadNewRecoveryCode() {
+    const code = dom.newRecoveryCode.textContent;
+    if (!code) return;
+    const text = [
+      '氢导航 · 新的云端数据恢复码',
+      '',
+      code,
+      '',
+      `账号：${sync.user ? sync.user.email : ''}`,
+      `生成时间：${new Date().toLocaleString()}`,
+      '',
+      '这个恢复码已替换旧恢复码。忘记加密密码时，用这个恢复码解锁云端数据。',
+      '请离线保存，不要发给任何人。',
+    ].join('\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'qingdh-recovery-code.txt';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 
   function documentLinkCount(doc) {
@@ -5835,6 +5975,20 @@
   dom.encryptionEnable.addEventListener('click', openEncryptDialog);
   dom.encryptionUnlock.addEventListener('click', unlockFromPanel);
   dom.encryptionChange.addEventListener('click', openChangeEncryptionDialog);
+  dom.encryptionRecovery.addEventListener('click', openRotateRecoveryDialog);
+  dom.rotateRecoveryForm.addEventListener('submit', submitRotateRecovery);
+  dom.newRecoverySave.addEventListener('click', finishRotateRecovery);
+  dom.newRecoveryCopy.addEventListener('click', copyNewRecoveryCode);
+  dom.newRecoveryDownload.addEventListener('click', downloadNewRecoveryCode);
+  dom.newRecoveryConfirm.addEventListener('change', () => {
+    if (dom.newRecoveryConfirm.checked) dom.newRecoveryError.hidden = true;
+  });
+  dom.newRecoveryDialog.addEventListener('close', () => {
+    if (cryptoState.pendingRecovery) {
+      cryptoState.pendingRecovery = null;
+      showToast('已取消，旧恢复码继续有效');
+    }
+  });
   dom.encryptForm.addEventListener('submit', submitEncrypt);
   dom.changeEncryptionForm.addEventListener('submit', submitChangeEncryption);
   dom.changeEncryptionRecoveryToggle.addEventListener('change', () => {
