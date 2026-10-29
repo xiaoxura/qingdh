@@ -423,3 +423,78 @@ func (s *Server) handleDeleteAdminUser(w http.ResponseWriter, r *http.Request) {
 	s.audit(r.Context(), &current.ID, &id, "admin.user.delete", nil)
 	writeJSON(w, http.StatusOK, map[string]any{"status": "deleted"})
 }
+
+const (
+	auditPageSizeDefault = 50
+	auditPageSizeMax     = 200
+)
+
+type auditEntryDTO struct {
+	ID         int64           `json:"id"`
+	ActorID    *uuid.UUID      `json:"actorId"`
+	ActorEmail string          `json:"actorEmail"`
+	TargetID   *uuid.UUID      `json:"targetId"`
+	Action     string          `json:"action"`
+	Detail     json.RawMessage `json:"detail"`
+	CreatedAt  time.Time       `json:"createdAt"`
+}
+
+// handleAdminAudit returns a filterable, paginated audit trail. It never
+// returns passwords, tokens or decrypted user content; detail only carries
+// booleans, versions and similar metadata.
+func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	limit := auditPageSizeDefault
+	if raw := query.Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > auditPageSizeMax {
+		limit = auditPageSizeMax
+	}
+	offset := 0
+	if raw := query.Get("offset"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+	action := strings.TrimSpace(query.Get("action"))
+	if len(action) > 100 {
+		action = action[:100]
+	}
+	actor := strings.TrimSpace(query.Get("actor"))
+	if len(actor) > 200 {
+		actor = actor[:200]
+	}
+
+	entries, total, err := s.store.ListAuditPage(r.Context(), store.AuditFilter{
+		Action:     action,
+		ActorEmail: actor,
+		Limit:      limit,
+		Offset:     offset,
+	})
+	if err != nil {
+		s.logger.Error("list audit", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "服务器内部错误")
+		return
+	}
+
+	out := make([]auditEntryDTO, 0, len(entries))
+	for _, entry := range entries {
+		out = append(out, auditEntryDTO{
+			ID:         entry.ID,
+			ActorID:    entry.ActorID,
+			ActorEmail: entry.ActorEmail,
+			TargetID:   entry.TargetID,
+			Action:     entry.Action,
+			Detail:     entry.Detail,
+			CreatedAt:  entry.CreatedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"entries": out,
+		"total":   total,
+	})
+}

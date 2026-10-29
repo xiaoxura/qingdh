@@ -387,7 +387,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | A3 恢复码重新生成 | 已完成 | `web-tests/unit/crypto.test.mjs`（新码可解锁、旧码失败、密码与 data 不变、AAD/kind/篡改）；`reliability.mjs` 端到端重生成 | 新增 `crypto.rewrapRecovery` 与「重新生成恢复码」对话框 |
 | A4 关闭加密 | 已完成 | `TestDisableEncryption*`（未登录/未加密/密码错/409/依赖/成功 v2+审计）；`reliability.mjs`（失败保持加密、vault/sessionStorage 清理、明文保留、跨标签页通知） | 显式端点 + `DELETE /secrets/{kind}`；PUT 降级防护未放宽 |
 | A5 服务端版本历史 | 已完成 | 迁移 0010；`TestWorkspaceRevisions*`（成功写入才记录、409/跨用户、v3 保留、20 份/30 天、级联删除、8 并发仅 1 成功）+ `TestWorkspaceConcurrentPutsUseSingleRevision`；`reliability.mjs` 预览/恢复/快照；加密历史预览手工验证 | 新增 `/workspace/revisions` 两个只读接口；恢复复用 PUT，不新增恢复接口 |
-| A6 审计日志后台 | 待开始 | | |
+| A6 审计日志后台 | 已完成 | 迁移 0011；`TestAdminAudit*`（403、分页/动作/操作者筛选、删除管理员后 actor_email 保留、不泄露密文/密码/Key） | 新增 `GET /admin/audit` 与后台「审计」分类 |
 | A7 发布收口 | 待开始 | | 仅本地版本号、构建与文档；不推送 |
 | C1 拆分 app.js | 待开始 | | |
 | C2 补测试 | 待开始 | | |

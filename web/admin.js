@@ -25,6 +25,14 @@
     overviewPanel: $('#panel-overview'),
     settingsPanel: $('#panel-settings'),
     usersPanel: $('#panel-users'),
+    auditPanel: $('#panel-audit'),
+    auditAction: $('#audit-action'),
+    auditActor: $('#audit-actor'),
+    auditSearch: $('#audit-search'),
+    auditRows: $('#audit-rows'),
+    auditTotal: $('#audit-total'),
+    auditPrev: $('#audit-prev'),
+    auditNext: $('#audit-next'),
 
     overviewRefresh: $('#overview-refresh'),
     ovUsers: $('#ov-users'),
@@ -115,6 +123,12 @@
     total: 0,
     query: '',
     users: [],
+    auditPage: 1,
+    auditPageSize: 50,
+    auditTotal: 0,
+    auditEntries: [],
+    auditAction: '',
+    auditActor: '',
     clearPassword: false,
     passwordSet: false,
     siteLogo: '',
@@ -135,7 +149,7 @@
    * 基础
    * ------------------------------------------------------------------ */
 
-  const TABS = ['overview', 'users', 'site', 'access', 'security'];
+  const TABS = ['overview', 'users', 'audit', 'site', 'access', 'security'];
   const CONFIG_TABS = ['site', 'access', 'security'];
 
   function tabFromHash() {
@@ -1194,6 +1208,72 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * 审计
+   * ------------------------------------------------------------------ */
+
+  function formatDetail(detail) {
+    if (!detail || (typeof detail === 'object' && Object.keys(detail).length === 0)) return '—';
+    const text = JSON.stringify(detail);
+    return text.length > 160 ? `${text.slice(0, 157)}…` : text;
+  }
+
+  function renderAudit(entries) {
+    state.auditEntries = entries;
+    if (!entries.length) {
+      dom.auditRows.innerHTML = '<tr><td colspan="5" class="empty-row">没有匹配的审计记录</td></tr>';
+      return;
+    }
+    dom.auditRows.innerHTML = entries
+      .map((entry) => {
+        const actor = entry.actorEmail || (entry.actorId ? `ID ${String(entry.actorId).slice(0, 8)}` : '系统');
+        const target = entry.targetId ? String(entry.targetId).slice(0, 8) : '—';
+        return `<tr>
+          <td class="col-created">${escapeHTML(formatDate(entry.createdAt))}</td>
+          <td title="${escapeAttr(entry.actorEmail || '')}">${escapeHTML(actor)}</td>
+          <td><code class="audit-action">${escapeHTML(entry.action)}</code></td>
+          <td class="col-target" title="${escapeAttr(entry.targetId || '')}">${escapeHTML(target)}</td>
+          <td><span class="audit-detail" title="${escapeAttr(formatDetail(entry.detail))}">${escapeHTML(formatDetail(entry.detail))}</span></td>
+        </tr>`;
+      })
+      .join('');
+  }
+
+  async function loadAudit() {
+    const params = new URLSearchParams({
+      limit: String(state.auditPageSize),
+      offset: String((state.auditPage - 1) * state.auditPageSize),
+    });
+    if (state.auditAction) params.set('action', state.auditAction);
+    if (state.auditActor) params.set('actor', state.auditActor);
+
+    const response = await api('/api/v1/admin/audit?' + params.toString());
+    if (response.status === 401 || response.status === 403) {
+      showGate('管理员会话已失效，请重新登录。');
+      return;
+    }
+    if (!response.ok) {
+      toast(errorMessage(response, '读取审计日志失败'));
+      return;
+    }
+
+    state.auditTotal = response.data.total || 0;
+    renderAudit(response.data.entries || []);
+
+    const start = state.auditTotal === 0 ? 0 : (state.auditPage - 1) * state.auditPageSize + 1;
+    const end = Math.min(state.auditPage * state.auditPageSize, state.auditTotal);
+    dom.auditTotal.textContent = state.auditTotal === 0 ? '共 0 条' : `第 ${start}-${end} 条，共 ${state.auditTotal} 条`;
+    dom.auditPrev.disabled = state.auditPage <= 1;
+    dom.auditNext.disabled = end >= state.auditTotal;
+  }
+
+  function applyAuditFilters() {
+    state.auditAction = dom.auditAction.value.trim();
+    state.auditActor = dom.auditActor.value.trim();
+    state.auditPage = 1;
+    loadAudit();
+  }
+
+  /* ------------------------------------------------------------------ *
    * 交互
    * ------------------------------------------------------------------ */
 
@@ -1210,6 +1290,7 @@
     dom.overviewPanel.hidden = tab !== 'overview';
     dom.settingsPanel.hidden = !config;
     dom.usersPanel.hidden = tab !== 'users';
+    dom.auditPanel.hidden = tab !== 'audit';
     document.querySelectorAll('[data-config-group]').forEach((card) => {
       card.hidden = !config || card.dataset.configGroup !== tab;
     });
@@ -1220,7 +1301,26 @@
 
     if (tab === 'overview') loadOverview();
     if (tab === 'users') loadUsers();
+    if (tab === 'audit') loadAudit();
   }
+
+  dom.auditSearch.addEventListener('click', applyAuditFilters);
+  dom.auditAction.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') applyAuditFilters();
+  });
+  dom.auditActor.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') applyAuditFilters();
+  });
+  dom.auditPrev.addEventListener('click', () => {
+    if (state.auditPage <= 1) return;
+    state.auditPage -= 1;
+    loadAudit();
+  });
+  dom.auditNext.addEventListener('click', () => {
+    if ((state.auditPage * state.auditPageSize) >= state.auditTotal) return;
+    state.auditPage += 1;
+    loadAudit();
+  });
 
   dom.themeBtn.addEventListener('click', () => {
     const next = resolveTheme() === 'dark' ? 'light' : 'dark';

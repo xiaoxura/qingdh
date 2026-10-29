@@ -165,6 +165,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/ai/usage", s.requireAuth(s.handleAIUsage))
 
 	mux.HandleFunc("GET /api/v1/admin/overview", s.requireAdmin(s.handleAdminOverview))
+	mux.HandleFunc("GET /api/v1/admin/audit", s.requireAdmin(s.handleAdminAudit))
 	mux.HandleFunc("GET /api/v1/admin/settings", s.requireAdmin(s.handleGetAdminSettings))
 	mux.HandleFunc("PUT /api/v1/admin/settings", s.requireAdmin(s.handlePutAdminSettings))
 	mux.HandleFunc("POST /api/v1/admin/settings/test-email", s.requireAdmin(s.handleTestEmail))

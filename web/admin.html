@@ -41,6 +41,13 @@
             <span class="tab-text">用户管理</span>
             <span class="nav-count" id="nav-user-count" hidden>0</span>
           </button>
+          <button class="tab" type="button" role="tab" data-tab="audit" aria-selected="false" title="审计日志">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 3h9a2 2 0 0 1 2 2v16H7a2 2 0 0 1-2-2V6" />
+              <path d="M5 3v5h5M9 12h7M9 16h5" />
+            </svg>
+            <span class="tab-text">审计</span>
+          </button>
           <p class="nav-label nav-label-inline">配置</p>
           <button class="tab" type="button" role="tab" data-tab="site" aria-selected="false" title="站点设置">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -456,6 +463,64 @@
                 <div class="pager-actions">
                   <button class="btn btn-small" id="page-prev" type="button">上一页</button>
                   <button class="btn btn-small" id="page-next" type="button">下一页</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="panel-audit" class="panel" hidden>
+          <section class="card">
+            <div class="card-head">
+              <span class="icon-tile tint-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 3h9a2 2 0 0 1 2 2v16H7a2 2 0 0 1-2-2V6" />
+                  <path d="M5 3v5h5M9 12h7M9 16h5" />
+                </svg>
+              </span>
+              <div>
+                <h2>审计日志</h2>
+                <p>设置变更、账号操作与加密生命周期的操作者快照；不包含密码、token、密文或用户内容。</p>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="toolbar">
+                <div class="search-box">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M4 6h16M7 12h10M10 18h4" />
+                  </svg>
+                  <input id="audit-action" type="search" placeholder="动作，例如 admin.user.update" autocomplete="off" />
+                </div>
+                <div class="search-box">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.4" />
+                    <path d="M5.2 20c.5-3.8 3.1-5.8 6.8-5.8s6.3 2 6.8 5.8" />
+                  </svg>
+                  <input id="audit-actor" type="search" placeholder="操作者邮箱…" autocomplete="off" />
+                </div>
+                <button class="btn" id="audit-search" type="button">筛选</button>
+              </div>
+
+              <div class="table-wrap">
+                <table class="user-table audit-table">
+                  <thead>
+                    <tr>
+                      <th class="col-created">时间</th>
+                      <th>操作者</th>
+                      <th>动作</th>
+                      <th class="col-target">目标</th>
+                      <th>详情</th>
+                    </tr>
+                  </thead>
+                  <tbody id="audit-rows"></tbody>
+                </table>
+              </div>
+
+              <div class="pager">
+                <span id="audit-total" class="pager-total"></span>
+                <div class="pager-actions">
+                  <button class="btn btn-small" id="audit-prev" type="button">上一页</button>
+                  <button class="btn btn-small" id="audit-next" type="button">下一页</button>
                 </div>
               </div>
             </div>

@@ -116,7 +116,7 @@ data             = AES-GCM(dataKey, JSON.stringify(payload v2))
 
 仍未做：
 
-- 管理员访问审计日志（A6 本轮实施）；
+
 - 强制所有用户迁移到加密模式。
 
 已完成（2026-10-29）：
@@ -203,7 +203,7 @@ data             = AES-GCM(dataKey, JSON.stringify(payload v2))
 仍未做：
 
 - Passkey H2（服务端可信设备、远程撤销）；
-- 管理员访问审计日志（A6 本轮实施）；
+
 - 服务端全文搜索/多端实时同步；
 - 文件/图片附件与多人协作。
 
