@@ -236,7 +236,7 @@ python3 -m http.server 8080 --directory web
 
 ## API
 
-统一前缀 `/api/v1`，JSON 请求与响应，Cookie 会话；完整设计见 [后端设计草案](docs/backend-design.md)。
+统一前缀 `/api/v1`，JSON 请求与响应，Cookie 会话；完整设计见 [后端设计](docs/backend-design.md)。
 
 ```text
 POST   /auth/register            POST /auth/login          POST /auth/logout
