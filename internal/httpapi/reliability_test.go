@@ -1,9 +1,11 @@
 package httpapi_test
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/XiaoXuRa/qingdh/internal/config"
 	"github.com/XiaoXuRa/qingdh/internal/settings"
@@ -71,5 +73,60 @@ func TestAbsoluteSessionLimitIsDynamic(t *testing.T) {
 	resp := c.do(http.MethodGet, "/api/v1/auth/me", "")
 	if resp.status != http.StatusUnauthorized {
 		t.Fatalf("aged session = %d %s", resp.status, resp.body)
+	}
+}
+
+// TestRenewalFailureDoesNotRejectRequest 覆盖 B7：续期写库失败时，请求仍应按
+// 已认证成功处理，而不是返回 500；下一次请求会重新尝试续期。
+func TestRenewalFailureDoesNotRejectRequest(t *testing.T) {
+	env := newEnv(t, nil)
+	c := env.client(t)
+	registerVerified(t, env, c, "renew-fail@example.com", "correct horse battery")
+
+	session, err := env.store.LatestSessionForEmail(t.Context(), "renew-fail@example.com")
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	// 把续期时间推到阈值之外，确保下一次请求会尝试写库。
+	if err := env.store.SetSessionTimes(t.Context(), session.ID, session.CreatedAt, time.Now().Add(-2*time.Hour)); err != nil {
+		t.Fatalf("age session: %v", err)
+	}
+
+	if _, err := env.store.Exec(t.Context(), `
+		CREATE OR REPLACE FUNCTION test_fail_session_renew() RETURNS trigger AS $$
+		BEGIN
+			RAISE EXCEPTION 'simulated renewal failure';
+		END;
+		$$ LANGUAGE plpgsql`); err != nil {
+		t.Fatalf("create trigger function: %v", err)
+	}
+	if _, err := env.store.Exec(t.Context(), `
+		CREATE TRIGGER test_fail_session_renew_trigger
+		BEFORE UPDATE ON sessions
+		FOR EACH ROW EXECUTE FUNCTION test_fail_session_renew()`); err != nil {
+		t.Fatalf("create trigger: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = env.store.Exec(context.Background(), `DROP TRIGGER IF EXISTS test_fail_session_renew_trigger ON sessions`)
+		_, _ = env.store.Exec(context.Background(), `DROP FUNCTION IF EXISTS test_fail_session_renew()`)
+	})
+
+	resp := c.do(http.MethodGet, "/api/v1/auth/me", "")
+	if resp.status != http.StatusOK {
+		t.Fatalf("request with failed renewal = %d %s", resp.status, resp.body)
+	}
+	if resp.header.Get("Set-Cookie") != "" {
+		t.Fatal("failed renewal must not emit a new cookie")
+	}
+
+	if _, err := env.store.Exec(t.Context(), `DROP TRIGGER test_fail_session_renew_trigger ON sessions`); err != nil {
+		t.Fatalf("drop trigger: %v", err)
+	}
+	recovered := c.do(http.MethodGet, "/api/v1/auth/me", "")
+	if recovered.status != http.StatusOK {
+		t.Fatalf("request after recovery = %d %s", recovered.status, recovered.body)
+	}
+	if recovered.header.Get("Set-Cookie") == "" {
+		t.Fatal("renewal should resume once the database accepts writes")
 	}
 }

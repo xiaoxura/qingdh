@@ -117,9 +117,10 @@ func (m *SessionManager) Authenticate(ctx context.Context, rawToken string) (sto
 	}
 	newExpiry, err := m.store.RenewSession(ctx, sess.ID, idleTTL, absoluteTTL, renewAfter)
 	if err != nil {
-		// A failed renewal must not log the user out; report the error but keep
-		// the session usable.
-		return sess, user, nil, err
+		// 续期只是滑动过期的优化：写库失败不能让一个已经验证通过的请求
+		// 变成 500。本次按“不续期”处理，下一次请求会再次尝试；会话本身
+		// 仍按 expires_at 生效。
+		return sess, user, nil, nil
 	}
 	return sess, user, newExpiry, nil
 }
