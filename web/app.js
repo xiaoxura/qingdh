@@ -14,7 +14,12 @@
 
   const storeLib = globalThis.QingdhStore;
   const renderLib = globalThis.QingdhRender;
-  if (!storeLib || !renderLib) throw new Error('QingdhStore/QingdhRender is not loaded');
+  const enginesLib = globalThis.QingdhEngines;
+  if (!storeLib || !renderLib || !enginesLib) {
+    throw new Error('QingdhStore/QingdhRender/QingdhEngines is not loaded');
+  }
+  const ENGINES = enginesLib.ENGINES;
+  const { engineBuild, engineHost } = enginesLib;
 
   const storage = storeLib.createStorage({
     storage: (() => {
@@ -88,39 +93,6 @@
   const SEARCH_HISTORY_KEY = 'qingdh.search-history.v1';
   const SEARCH_HISTORY_MAX = 80;
 
-  const ENGINES = [
-    {
-      id: 'bing',
-      name: 'Bing',
-      bang: 'b',
-      build: (query) => `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
-    },
-    {
-      id: 'google',
-      name: 'Google',
-      bang: 'g',
-      build: (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-    },
-    {
-      id: 'baidu',
-      name: '百度',
-      bang: 'bd',
-      build: (query) => `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`,
-    },
-    {
-      id: 'duckduckgo',
-      name: 'DuckDuckGo',
-      bang: 'd',
-      build: (query) => `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
-    },
-    {
-      id: 'metaso',
-      name: '秘塔',
-      bang: 'mt',
-      build: (query) => `https://metaso.cn/?q=${encodeURIComponent(query)}`,
-    },
-  ];
-
   const dataModel = globalThis.QingdhData.createDataModel({
     uid,
     toTimestamp,
@@ -139,6 +111,22 @@
     countGroups,
   } = dataModel;
 
+  const mergeModel = globalThis.QingdhMerge.createMergeModel({
+    normalizeData,
+    normalizeUrl,
+    clone,
+    now,
+  });
+  const {
+    linkIndexForMerge,
+    buildMergeDiff,
+    newer,
+    mergeSettings,
+    mergeLink,
+    mergeDocuments,
+    mergeGroup,
+  } = mergeModel;
+
   function allEngines() {
     const custom = data && data.settings && Array.isArray(data.settings.customEngines)
       ? data.settings.customEngines
@@ -153,13 +141,6 @@
     const seen = new Set(ordered.map((engine) => engine.id));
     for (const engine of all) if (!seen.has(engine.id)) ordered.push(engine);
     return ordered;
-  }
-
-  function engineBuild(engine) {
-    if (engine.template) {
-      return (query) => engine.template.replaceAll('{query}', encodeURIComponent(query));
-    }
-    return engine.build;
   }
 
   const ICON_PLUS =
@@ -196,312 +177,419 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
-  const dom = {
-    clock: $('#clock'),
-    today: $('#today'),
-    greeting: $('#greeting'),
+  const domSpec = {
+    clock: '#clock',
+    today: '#today',
+    greeting: '#greeting',
 
-    sidebar: $('#sidebar'),
-    brand: $('#brand-link'),
-    sidebarCollapse: $('#sidebar-collapse'),
-    sidebarHide: $('#sidebar-hide'),
-    sidebarReveal: $('#sidebar-reveal'),
-    sidebarOpen: $('#sidebar-open'),
-    sidebarScrim: $('#sidebar-scrim'),
-    homeNav: $('#home-nav'),
-    memoNav: $('#memo-nav'),
-    memoCount: $('#memo-count'),
-    historyNav: $('#history-nav'),
-    historyDialog: $('#history-dialog'),
-    historyList: $('#history-list'),
-    historySearch: $('#history-search'),
-    historyKinds: $$('[data-history-kind]'),
-    historyCount: $('#history-count'),
-    historyClear: $('#history-clear'),
+    sidebar: '#sidebar',
+    brand: '#brand-link',
+    sidebarCollapse: '#sidebar-collapse',
+    sidebarHide: '#sidebar-hide',
+    sidebarReveal: '#sidebar-reveal',
+    sidebarOpen: '#sidebar-open',
+    sidebarScrim: '#sidebar-scrim',
+    homeNav: '#home-nav',
+    memoNav: '#memo-nav',
+    memoCount: '#memo-count',
+    historyNav: '#history-nav',
+    historyDialog: '#history-dialog',
+    historyList: '#history-list',
+    historySearch: '#history-search',
+    historyKinds: { all: '[data-history-kind]' },
+    historyCount: '#history-count',
+    historyClear: '#history-clear',
 
-    searchForm: $('#search-form'),
-    searchInput: $('#search-input'),
-    engine: $('#engine'),
-    engineBtn: $('#engine-btn'),
-    aiModeBtn: $('#ai-mode-btn'),
-    engineName: $('#engine-name'),
-    engineMenu: $('#engine-menu'),
+    searchForm: '#search-form',
+    searchInput: '#search-input',
+    engine: '#engine',
+    engineBtn: '#engine-btn',
+    aiModeBtn: '#ai-mode-btn',
+    engineName: '#engine-name',
+    engineMenu: '#engine-menu',
 
-    groups: $('#groups'),
-    addLinkBtn: $('#add-link-btn'),
-    addGroupBtn: $('#add-group-btn'),
-    batchBtn: $('#batch-btn'),
-    batchBar: $('#batch-bar'),
-    batchCount: $('#batch-count'),
-    batchTarget: $('#batch-target'),
-    batchMove: $('#batch-move'),
-    batchDuplicates: $('#batch-duplicates'),
-    batchDelete: $('#batch-delete'),
-    batchCancel: $('#batch-cancel'),
+    groups: '#groups',
+    addLinkBtn: '#add-link-btn',
+    addGroupBtn: '#add-group-btn',
+    batchBtn: '#batch-btn',
+    batchBar: '#batch-bar',
+    batchCount: '#batch-count',
+    batchTarget: '#batch-target',
+    batchMove: '#batch-move',
+    batchDuplicates: '#batch-duplicates',
+    batchDelete: '#batch-delete',
+    batchCancel: '#batch-cancel',
 
-    themeBtn: $('#theme-btn'),
-    themeLabel: $('#theme-label'),
-    editBtn: $('#edit-btn'),
-    settingsBtn: $('#settings-btn'),
-    accountBtn: $('#account-btn'),
-    accountLabel: $('#account-label'),
-    accountAvatarMini: $('#account-avatar-mini'),
-    syncBadge: $('#sync-badge'),
-    syncBadgeText: $('#sync-badge-text'),
+    themeBtn: '#theme-btn',
+    themeLabel: '#theme-label',
+    editBtn: '#edit-btn',
+    settingsBtn: '#settings-btn',
+    accountBtn: '#account-btn',
+    accountLabel: '#account-label',
+    accountAvatarMini: '#account-avatar-mini',
+    syncBadge: '#sync-badge',
+    syncBadgeText: '#sync-badge-text',
 
-    linkDialog: $('#link-dialog'),
-    linkForm: $('#link-form'),
-    linkDialogTitle: $('#link-dialog-title'),
-    linkTitle: $('#link-title'),
-    linkUrl: $('#link-url'),
-    linkUrlError: $('#link-url-error'),
-    linkIcon: $('#link-icon'),
-    linkGroup: $('#link-group'),
-    linkGroupName: $('#link-group-name'),
-    linkSubmit: $('#link-submit'),
+    linkDialog: '#link-dialog',
+    linkForm: '#link-form',
+    linkDialogTitle: '#link-dialog-title',
+    linkTitle: '#link-title',
+    linkUrl: '#link-url',
+    linkUrlError: '#link-url-error',
+    linkIcon: '#link-icon',
+    linkGroup: '#link-group',
+    linkGroupName: '#link-group-name',
+    linkSubmit: '#link-submit',
 
-    groupDialog: $('#group-dialog'),
-    groupForm: $('#group-form'),
-    groupDialogTitle: $('#group-dialog-title'),
-    groupName: $('#group-name'),
+    groupDialog: '#group-dialog',
+    groupForm: '#group-form',
+    groupDialogTitle: '#group-dialog-title',
+    groupName: '#group-name',
 
-    hubDialog: $('#hub-dialog'),
-    hubTabs: $$('[data-hub-tab]'),
-    hubCategory: $('#hub-category'),
-    hubPanels: $$('[data-hub-panel]'),
-    hubPanelTitle: $('#hub-panel-title'),
-    hubPanelDesc: $('#hub-panel-desc'),
-    hubSubnav: $('#hub-subnav'),
-    hubBody: $('#hub-body'),
-    hubFootNote: $('#hub-foot-note'),
-    hubDone: $('#hub-done'),
-    aiConfigSave: $('#ai-config-save'),
-    aiConfigGate: $('#ai-config-gate'),
-    aiConfigGateTitle: $('#ai-config-gate-title'),
-    aiConfigGateDesc: $('#ai-config-gate-desc'),
-    aiConfigGateAction: $('#ai-config-gate-action'),
-    aiProviderList: $('#ai-provider-list'),
-    setName: $('#set-name'),
-    setDensity: $('#set-density'),
-    setEngine: $('#set-engine'),
-    engineConfigList: $('#engine-config-list'),
-    engineAddOpen: $('#engine-add-open'),
-    engineAddDialog: $('#engine-add-dialog'),
-    engineNewName: $('#engine-new-name'),
-    engineNewBang: $('#engine-new-bang'),
-    engineNewUrl: $('#engine-new-url'),
-    engineAddBtn: $('#engine-add-btn'),
-    engineAddError: $('#engine-add-error'),
-    setOpen: $('#set-open'),
-    setTheme: $('#set-theme'),
-    setClock: $('#set-clock'),
-    setHour: $('#set-hour'),
-    setSeconds: $('#set-seconds'),
-    setSidebar: $('#set-sidebar'),
-    setSidebarSide: $('#set-sidebar-side'),
-    setSidebarHover: $('#set-sidebar-hover'),
-    seasonPicker: $('#season-picker'),
-    exportBtn: $('#export-btn'),
-    importBtn: $('#import-btn'),
-    importFile: $('#import-file'),
-    jsonImportDialog: $('#json-import-dialog'),
-    jsonImportSource: $('#json-import-source'),
-    jsonImportSummary: $('#json-import-summary'),
-    jsonImportError: $('#json-import-error'),
-    jsonImportOk: $('#json-import-ok'),
-    importBookmarksBtn: $('#import-bookmarks-btn'),
-    bookmarksFile: $('#bookmarks-file'),
-    bookmarkImportDialog: $('#bookmark-import-dialog'),
-    bookmarkImportList: $('#bookmark-import-list'),
-    bookmarkImportSummary: $('#bookmark-import-summary'),
-    bookmarkImportOk: $('#bookmark-import-ok'),
-    restoreSnapshotBtn: $('#restore-snapshot-btn'),
-    revisionsBtn: $('#revisions-btn'),
-    revisionsDialog: $('#revisions-dialog'),
-    revisionsList: $('#revisions-list'),
-    revisionsError: $('#revisions-error'),
-    revisionPreview: $('#revision-preview'),
-    revisionPreviewTitle: $('#revision-preview-title'),
-    revisionPreviewBody: $('#revision-preview-body'),
-    revisionPreviewGroups: $('#revision-preview-groups'),
-    resetBtn: $('#reset-btn'),
+    hubDialog: '#hub-dialog',
+    hubTabs: { all: '[data-hub-tab]' },
+    hubCategory: '#hub-category',
+    hubPanels: { all: '[data-hub-panel]' },
+    hubPanelTitle: '#hub-panel-title',
+    hubPanelDesc: '#hub-panel-desc',
+    hubSubnav: '#hub-subnav',
+    hubBody: '#hub-body',
+    hubFootNote: '#hub-foot-note',
+    hubDone: '#hub-done',
+    aiConfigSave: '#ai-config-save',
+    aiConfigGate: '#ai-config-gate',
+    aiConfigGateTitle: '#ai-config-gate-title',
+    aiConfigGateDesc: '#ai-config-gate-desc',
+    aiConfigGateAction: '#ai-config-gate-action',
+    aiProviderList: '#ai-provider-list',
+    setName: '#set-name',
+    setDensity: '#set-density',
+    setEngine: '#set-engine',
+    engineConfigList: '#engine-config-list',
+    engineAddOpen: '#engine-add-open',
+    engineAddDialog: '#engine-add-dialog',
+    engineNewName: '#engine-new-name',
+    engineNewBang: '#engine-new-bang',
+    engineNewUrl: '#engine-new-url',
+    engineAddBtn: '#engine-add-btn',
+    engineAddError: '#engine-add-error',
+    setOpen: '#set-open',
+    setTheme: '#set-theme',
+    setClock: '#set-clock',
+    setHour: '#set-hour',
+    setSeconds: '#set-seconds',
+    setSidebar: '#set-sidebar',
+    setSidebarSide: '#set-sidebar-side',
+    setSidebarHover: '#set-sidebar-hover',
+    seasonPicker: '#season-picker',
+    exportBtn: '#export-btn',
+    importBtn: '#import-btn',
+    importFile: '#import-file',
+    jsonImportDialog: '#json-import-dialog',
+    jsonImportSource: '#json-import-source',
+    jsonImportSummary: '#json-import-summary',
+    jsonImportError: '#json-import-error',
+    jsonImportOk: '#json-import-ok',
+    importBookmarksBtn: '#import-bookmarks-btn',
+    bookmarksFile: '#bookmarks-file',
+    bookmarkImportDialog: '#bookmark-import-dialog',
+    bookmarkImportList: '#bookmark-import-list',
+    bookmarkImportSummary: '#bookmark-import-summary',
+    bookmarkImportOk: '#bookmark-import-ok',
+    restoreSnapshotBtn: '#restore-snapshot-btn',
+    revisionsBtn: '#revisions-btn',
+    revisionsDialog: '#revisions-dialog',
+    revisionsList: '#revisions-list',
+    revisionsError: '#revisions-error',
+    revisionPreview: '#revision-preview',
+    revisionPreviewTitle: '#revision-preview-title',
+    revisionPreviewBody: '#revision-preview-body',
+    revisionPreviewGroups: '#revision-preview-groups',
+    resetBtn: '#reset-btn',
 
-    accountGuest: $('#account-guest'),
-    accountUser: $('#account-user'),
-    accountAvatar: $('#account-avatar'),
-    accountEmail: $('#account-email'),
-    accountMeta: $('#account-meta'),
-    authNote: $('#auth-note'),
+    accountGuest: '#account-guest',
+    accountUser: '#account-user',
+    accountAvatar: '#account-avatar',
+    accountEmail: '#account-email',
+    accountMeta: '#account-meta',
+    authNote: '#auth-note',
 
-    loginForm: $('#login-form'),
-    loginEmail: $('#login-email'),
-    loginPassword: $('#login-password'),
-    loginError: $('#login-error'),
-    loginSubmit: $('#login-submit'),
-    forgotLink: $('#forgot-link'),
-    resendLink: $('#resend-link'),
+    loginForm: '#login-form',
+    loginEmail: '#login-email',
+    loginPassword: '#login-password',
+    loginError: '#login-error',
+    loginSubmit: '#login-submit',
+    forgotLink: '#forgot-link',
+    resendLink: '#resend-link',
 
-    registerForm: $('#register-form'),
-    registerEmail: $('#register-email'),
-    registerPassword: $('#register-password'),
-    registerPassword2: $('#register-password2'),
-    registerError: $('#register-error'),
-    registerSubmit: $('#register-submit'),
+    registerForm: '#register-form',
+    registerEmail: '#register-email',
+    registerPassword: '#register-password',
+    registerPassword2: '#register-password2',
+    registerError: '#register-error',
+    registerSubmit: '#register-submit',
 
-    forgotForm: $('#forgot-form'),
-    forgotEmail: $('#forgot-email'),
-    forgotError: $('#forgot-error'),
-    forgotSubmit: $('#forgot-submit'),
-    forgotBack: $('#forgot-back'),
+    forgotForm: '#forgot-form',
+    forgotEmail: '#forgot-email',
+    forgotError: '#forgot-error',
+    forgotSubmit: '#forgot-submit',
+    forgotBack: '#forgot-back',
 
-    syncPanel: $('[data-hub-panel="sync"]'),
-    syncGuestPanel: $('#sync-guest-panel'),
-    syncManagerPanel: $('#sync-manager-panel'),
-    syncCloudTotal: $('#sync-cloud-total'),
-    syncLocalTotal: $('#sync-local-total'),
-    syncPageState: $('#sync-page-state'),
-    syncItemList: $('#sync-item-list'),
-    syncAutoToggle: $('#sync-auto-toggle'),
-    syncPageNow: $('#sync-page-now'),
-    encryptionState: $('#encryption-state'),
-    encryptionPanel: $('#encryption-panel'),
-    encryptionGuest: $('#encryption-guest'),
-    encryptionHint: $('#encryption-hint'),
-    encryptionEnable: $('#encryption-enable'),
-    encryptionUnlock: $('#encryption-unlock'),
-    encryptionChange: $('#encryption-change'),
-    encryptionRecovery: $('#encryption-recovery'),
-    encryptionDisable: $('#encryption-disable'),
-    disableEncryptionDialog: $('#disable-encryption-dialog'),
-    disableEncryptionForm: $('#disable-encryption-form'),
-    disableEncryptionDependency: $('#disable-encryption-dependency'),
-    disableEncryptionDependencyMessage: $('#disable-encryption-dependency-message'),
-    disableEncryptionDiscard: $('#disable-encryption-discard'),
-    disableEncryptionPassword: $('#disable-encryption-password'),
-    disableEncryptionConfirm: $('#disable-encryption-confirm'),
-    disableEncryptionError: $('#disable-encryption-error'),
-    disableEncryptionSubmit: $('#disable-encryption-submit'),
-    encryptDialog: $('#encrypt-dialog'),
-    encryptForm: $('#encrypt-form'),
-    encryptPassword: $('#encrypt-password'),
-    encryptPassword2: $('#encrypt-password2'),
-    encryptError: $('#encrypt-error'),
-    encryptSubmit: $('#encrypt-submit'),
-    recoveryDialog: $('#recovery-dialog'),
-    recoveryCode: $('#recovery-code'),
-    recoveryCopy: $('#recovery-copy'),
-    recoveryDownload: $('#recovery-download'),
-    recoveryConfirm: $('#recovery-confirm'),
-    recoveryContinue: $('#recovery-continue'),
-    recoveryError: $('#recovery-error'),
-    unlockDialog: $('#unlock-dialog'),
-    unlockForm: $('#unlock-form'),
-    unlockMessage: $('#unlock-message'),
-    unlockPassword: $('#unlock-password'),
-    unlockRecoveryToggle: $('#unlock-recovery-toggle'),
-    unlockRecoveryField: $('#unlock-recovery-field'),
-    unlockRecovery: $('#unlock-recovery'),
-    unlockRemember: $('#unlock-remember'),
-    unlockRememberLine: $('#unlock-remember-line'),
-    unlockRememberNote: $('#unlock-remember-note'),
-    unlockError: $('#unlock-error'),
-    unlockSubmit: $('#unlock-submit'),
-    unlockLater: $('#unlock-later'),
-    deviceState: $('#device-state'),
-    deviceHint: $('#device-hint'),
-    deviceForget: $('#device-forget'),
-    passkeyState: $('#passkey-state'),
-    passkeyHint: $('#passkey-hint'),
-    passkeyEnable: $('#passkey-enable'),
-    passkeyRemove: $('#passkey-remove'),
-    passkeyDialog: $('#passkey-dialog'),
-    passkeyError: $('#passkey-error'),
-    passkeyVerify: $('#passkey-verify'),
-    passkeyUsePassword: $('#passkey-use-password'),
-    rotateRecoveryDialog: $('#rotate-recovery-dialog'),
-    rotateRecoveryForm: $('#rotate-recovery-form'),
-    rotateRecoveryPassword: $('#rotate-recovery-password'),
-    rotateRecoveryError: $('#rotate-recovery-error'),
-    rotateRecoverySubmit: $('#rotate-recovery-submit'),
-    newRecoveryDialog: $('#new-recovery-dialog'),
-    newRecoveryCode: $('#new-recovery-code'),
-    newRecoveryConfirm: $('#new-recovery-confirm'),
-    newRecoveryError: $('#new-recovery-error'),
-    newRecoverySave: $('#new-recovery-save'),
-    newRecoveryCopy: $('#new-recovery-copy'),
-    newRecoveryDownload: $('#new-recovery-download'),
-    changeEncryptionDialog: $('#change-encryption-dialog'),
-    changeEncryptionForm: $('#change-encryption-form'),
-    changeEncryptionOld: $('#change-encryption-old'),
-    changeEncryptionOldField: $('#change-encryption-old-field'),
-    changeEncryptionRecoveryToggle: $('#change-encryption-recovery-toggle'),
-    changeEncryptionRecoveryField: $('#change-encryption-recovery-field'),
-    changeEncryptionRecovery: $('#change-encryption-recovery'),
-    changeEncryptionNew: $('#change-encryption-new'),
-    changeEncryptionNew2: $('#change-encryption-new2'),
-    changeEncryptionError: $('#change-encryption-error'),
-    changeEncryptionSubmit: $('#change-encryption-submit'),
-    decryptFileDialog: $('#decrypt-file-dialog'),
-    decryptFileForm: $('#decrypt-file-form'),
-    decryptFilePassword: $('#decrypt-file-password'),
-    decryptFileRecoveryToggle: $('#decrypt-file-recovery-toggle'),
-    decryptFileRecoveryField: $('#decrypt-file-recovery-field'),
-    decryptFileRecovery: $('#decrypt-file-recovery'),
-    decryptFileError: $('#decrypt-file-error'),
-    decryptFileSubmit: $('#decrypt-file-submit'),
-    decryptFileCancel: $('#decrypt-file-cancel'),
-    sessionsBlock: $('#sessions-block'),
-    sessionsList: $('#sessions-list'),
-    adminLink: $('#admin-link'),
-    changeEmailBtn: $('#change-email'),
-    changeEmailHint: $('#email-change-hint'),
-    changeEmailDialog: $('#change-email-dialog'),
-    changeEmailForm: $('#change-email-form'),
-    changeEmailCurrent: $('#change-email-current'),
-    changeEmailPassword: $('#change-email-password'),
-    changeEmailNew: $('#change-email-new'),
-    changeEmailError: $('#change-email-error'),
-    changeEmailSubmit: $('#change-email-submit'),
-    changePasswordBtn: $('#change-password'),
-    logoutAllBtn: $('#logout-all'),
-    logoutBtn: $('#logout'),
-    deleteAccountBtn: $('#delete-account'),
-    changePasswordDialog: $('#change-password-dialog'),
-    changePasswordForm: $('#change-password-form'),
-    changePasswordCurrent: $('#change-password-current'),
-    changePasswordNew: $('#change-password-new'),
-    changePasswordNew2: $('#change-password-new2'),
-    changePasswordError: $('#change-password-error'),
-    changePasswordSubmit: $('#change-password-submit'),
+    syncPanel: '[data-hub-panel="sync"]',
+    syncGuestPanel: '#sync-guest-panel',
+    syncManagerPanel: '#sync-manager-panel',
+    syncCloudTotal: '#sync-cloud-total',
+    syncLocalTotal: '#sync-local-total',
+    syncPageState: '#sync-page-state',
+    syncItemList: '#sync-item-list',
+    syncAutoToggle: '#sync-auto-toggle',
+    syncPageNow: '#sync-page-now',
+    encryptionState: '#encryption-state',
+    encryptionPanel: '#encryption-panel',
+    encryptionGuest: '#encryption-guest',
+    encryptionHint: '#encryption-hint',
+    encryptionEnable: '#encryption-enable',
+    encryptionUnlock: '#encryption-unlock',
+    encryptionChange: '#encryption-change',
+    encryptionRecovery: '#encryption-recovery',
+    encryptionDisable: '#encryption-disable',
+    disableEncryptionDialog: '#disable-encryption-dialog',
+    disableEncryptionForm: '#disable-encryption-form',
+    disableEncryptionDependency: '#disable-encryption-dependency',
+    disableEncryptionDependencyMessage: '#disable-encryption-dependency-message',
+    disableEncryptionDiscard: '#disable-encryption-discard',
+    disableEncryptionPassword: '#disable-encryption-password',
+    disableEncryptionConfirm: '#disable-encryption-confirm',
+    disableEncryptionError: '#disable-encryption-error',
+    disableEncryptionSubmit: '#disable-encryption-submit',
+    encryptDialog: '#encrypt-dialog',
+    encryptForm: '#encrypt-form',
+    encryptPassword: '#encrypt-password',
+    encryptPassword2: '#encrypt-password2',
+    encryptError: '#encrypt-error',
+    encryptSubmit: '#encrypt-submit',
+    recoveryDialog: '#recovery-dialog',
+    recoveryCode: '#recovery-code',
+    recoveryCopy: '#recovery-copy',
+    recoveryDownload: '#recovery-download',
+    recoveryConfirm: '#recovery-confirm',
+    recoveryContinue: '#recovery-continue',
+    recoveryError: '#recovery-error',
+    unlockDialog: '#unlock-dialog',
+    unlockForm: '#unlock-form',
+    unlockMessage: '#unlock-message',
+    unlockPassword: '#unlock-password',
+    unlockRecoveryToggle: '#unlock-recovery-toggle',
+    unlockRecoveryField: '#unlock-recovery-field',
+    unlockRecovery: '#unlock-recovery',
+    unlockRemember: '#unlock-remember',
+    unlockRememberLine: '#unlock-remember-line',
+    unlockRememberNote: '#unlock-remember-note',
+    unlockError: '#unlock-error',
+    unlockSubmit: '#unlock-submit',
+    unlockLater: '#unlock-later',
+    deviceState: '#device-state',
+    deviceHint: '#device-hint',
+    deviceForget: '#device-forget',
+    passkeyState: '#passkey-state',
+    passkeyHint: '#passkey-hint',
+    passkeyEnable: '#passkey-enable',
+    passkeyRemove: '#passkey-remove',
+    passkeyDialog: '#passkey-dialog',
+    passkeyError: '#passkey-error',
+    passkeyVerify: '#passkey-verify',
+    passkeyUsePassword: '#passkey-use-password',
+    rotateRecoveryDialog: '#rotate-recovery-dialog',
+    rotateRecoveryForm: '#rotate-recovery-form',
+    rotateRecoveryPassword: '#rotate-recovery-password',
+    rotateRecoveryError: '#rotate-recovery-error',
+    rotateRecoverySubmit: '#rotate-recovery-submit',
+    newRecoveryDialog: '#new-recovery-dialog',
+    newRecoveryCode: '#new-recovery-code',
+    newRecoveryConfirm: '#new-recovery-confirm',
+    newRecoveryError: '#new-recovery-error',
+    newRecoverySave: '#new-recovery-save',
+    newRecoveryCopy: '#new-recovery-copy',
+    newRecoveryDownload: '#new-recovery-download',
+    changeEncryptionDialog: '#change-encryption-dialog',
+    changeEncryptionForm: '#change-encryption-form',
+    changeEncryptionOld: '#change-encryption-old',
+    changeEncryptionOldField: '#change-encryption-old-field',
+    changeEncryptionRecoveryToggle: '#change-encryption-recovery-toggle',
+    changeEncryptionRecoveryField: '#change-encryption-recovery-field',
+    changeEncryptionRecovery: '#change-encryption-recovery',
+    changeEncryptionNew: '#change-encryption-new',
+    changeEncryptionNew2: '#change-encryption-new2',
+    changeEncryptionError: '#change-encryption-error',
+    changeEncryptionSubmit: '#change-encryption-submit',
+    decryptFileDialog: '#decrypt-file-dialog',
+    decryptFileForm: '#decrypt-file-form',
+    decryptFilePassword: '#decrypt-file-password',
+    decryptFileRecoveryToggle: '#decrypt-file-recovery-toggle',
+    decryptFileRecoveryField: '#decrypt-file-recovery-field',
+    decryptFileRecovery: '#decrypt-file-recovery',
+    decryptFileError: '#decrypt-file-error',
+    decryptFileSubmit: '#decrypt-file-submit',
+    decryptFileCancel: '#decrypt-file-cancel',
+    sessionsBlock: '#sessions-block',
+    sessionsList: '#sessions-list',
+    adminLink: '#admin-link',
+    changeEmailBtn: '#change-email',
+    changeEmailHint: '#email-change-hint',
+    changeEmailDialog: '#change-email-dialog',
+    changeEmailForm: '#change-email-form',
+    changeEmailCurrent: '#change-email-current',
+    changeEmailPassword: '#change-email-password',
+    changeEmailNew: '#change-email-new',
+    changeEmailError: '#change-email-error',
+    changeEmailSubmit: '#change-email-submit',
+    changePasswordBtn: '#change-password',
+    logoutAllBtn: '#logout-all',
+    logoutBtn: '#logout',
+    deleteAccountBtn: '#delete-account',
+    changePasswordDialog: '#change-password-dialog',
+    changePasswordForm: '#change-password-form',
+    changePasswordCurrent: '#change-password-current',
+    changePasswordNew: '#change-password-new',
+    changePasswordNew2: '#change-password-new2',
+    changePasswordError: '#change-password-error',
+    changePasswordSubmit: '#change-password-submit',
 
-    mergeDialog: $('#merge-dialog'),
-    mergeTitle: $('#merge-title'),
-    mergeMessage: $('#merge-message'),
-    mergeDiff: $('#merge-diff'),
+    mergeDialog: '#merge-dialog',
+    mergeTitle: '#merge-title',
+    mergeMessage: '#merge-message',
+    mergeDiff: '#merge-diff',
 
-    resetDialog: $('#reset-dialog'),
-    resetForm: $('#reset-form'),
-    resetPassword: $('#reset-password'),
-    resetPassword2: $('#reset-password2'),
-    resetError: $('#reset-error'),
-    resetSubmit: $('#reset-submit'),
+    resetDialog: '#reset-dialog',
+    resetForm: '#reset-form',
+    resetPassword: '#reset-password',
+    resetPassword2: '#reset-password2',
+    resetError: '#reset-error',
+    resetSubmit: '#reset-submit',
 
-    deleteDialog: $('#delete-dialog'),
-    deleteForm: $('#delete-form'),
-    deletePassword: $('#delete-password'),
-    deleteError: $('#delete-error'),
-    deleteSubmit: $('#delete-submit'),
+    deleteDialog: '#delete-dialog',
+    deleteForm: '#delete-form',
+    deletePassword: '#delete-password',
+    deleteError: '#delete-error',
+    deleteSubmit: '#delete-submit',
 
-    confirmDialog: $('#confirm-dialog'),
-    confirmTitle: $('#confirm-title'),
-    confirmMessage: $('#confirm-message'),
-    confirmOk: $('#confirm-ok'),
-    confirmCancel: $('#confirm-cancel'),
+    confirmDialog: '#confirm-dialog',
+    confirmTitle: '#confirm-title',
+    confirmMessage: '#confirm-message',
+    confirmOk: '#confirm-ok',
+    confirmCancel: '#confirm-cancel',
 
-    toast: $('#toast'),
-    toastMessage: $('#toast-message'),
-    toastAction: $('#toast-action'),
+    toast: '#toast',
+    toastMessage: '#toast-message',
+    toastAction: '#toast-action',
   };
+
+  // 对话框的 HTML 先放在 <template> 里，首次打开任意对话框时一次性注入。
+  // dom 通过 Proxy 惰性解析：元素还不存在时返回一个可记录监听器的占位对象，
+  // 注入完成后清空缓存并把这些监听器绑定到真实元素上。
+  const domCache = new Map();
+  const domPlaceholders = new Map();
+
+  function makeDomPlaceholder(key) {
+    if (domPlaceholders.has(key)) return domPlaceholders.get(key).stub;
+    const listeners = [];
+    const noop = () => {};
+    const stub = {
+      __qingdhPlaceholder: true,
+      addEventListener(type, fn, opts) {
+        listeners.push({ type, fn, opts });
+      },
+      removeEventListener: noop,
+      dispatchEvent: () => false,
+      setAttribute: noop,
+      removeAttribute: noop,
+      getAttribute: () => null,
+      hasAttribute: () => false,
+      toggleAttribute: noop,
+      focus: noop,
+      blur: noop,
+      click: noop,
+      reset: noop,
+      showModal: noop,
+      close: noop,
+      appendChild: noop,
+      removeChild: noop,
+      remove: noop,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
+      style: {},
+      dataset: {},
+      hidden: false,
+      value: '',
+      checked: false,
+      disabled: false,
+      open: false,
+      textContent: '',
+      innerHTML: '',
+      title: '',
+      href: '',
+      src: '',
+    };
+    domPlaceholders.set(key, { stub, listeners });
+    return stub;
+  }
+
+  function resolveDomKey(key) {
+    const spec = domSpec[key];
+    if (typeof spec === 'string') return spec ? document.querySelector(spec) : null;
+    if (spec && spec.all) return Array.from(document.querySelectorAll(spec.all));
+    return null;
+  }
+
+  const dom = new Proxy({}, {
+    get(_target, key) {
+      if (domCache.has(key)) return domCache.get(key);
+      const value = resolveDomKey(key) ?? makeDomPlaceholder(key);
+      domCache.set(key, value);
+      return value;
+    },
+  });
+
+  let dialogsInjected = false;
+
+  // 首次打开任意对话框时，把 26 个 <template> 中的 dialog 一次性注入 DOM。
+  // 之后清空 dom 缓存，并把此前在占位对象上注册的监听器重放到真实元素。
+  function ensureDialogs() {
+    if (dialogsInjected) return;
+    dialogsInjected = true;
+    for (const template of Array.from(document.querySelectorAll('template[data-dialog-template]'))) {
+      const dialog = template.content.querySelector('dialog');
+      if (dialog) document.body.appendChild(dialog);
+      template.remove();
+    }
+    domCache.clear();
+    initDialogControllers();
+    enhanceDialogSelects();
+    for (const [key, record] of domPlaceholders) {
+      const element = resolveDomKey(key);
+      if (element && typeof element.addEventListener === 'function') {
+        for (const { type, fn, opts } of record.listeners) element.addEventListener(type, fn, opts);
+      }
+    }
+    domPlaceholders.clear();
+    bindDialogShells();
+  }
+
+  function bindDialogShells() {
+    document.querySelectorAll('dialog').forEach((dialog) => {
+      if (dialog.dataset.shellBound === '1') return;
+      dialog.dataset.shellBound = '1';
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+    });
+  }
+
+  function enhanceDialogSelects() {
+    if (!globalThis.QingdhSelect) return;
+    if (dom.linkGroup && !dom.linkGroup.__qingdhPlaceholder) QingdhSelect.enhance(dom.linkGroup);
+  }
 
   /* ------------------------------------------------------------------ *
    * 状态
@@ -584,9 +672,15 @@
   // 已打开的 dialog 不再重复 showModal()（B4）。
   const dialogLib = globalThis.QingdhDialog;
   if (!dialogLib) throw new Error('QingdhDialog is not loaded');
-  const unlockModal = dialogLib.createModal(dom.unlockDialog);
-  const decryptFileModal = dialogLib.createModal(dom.decryptFileDialog);
-  const passkeyModal = dialogLib.createModal(dom.passkeyDialog);
+  let unlockModal = null;
+  let decryptFileModal = null;
+  let passkeyModal = null;
+
+  function initDialogControllers() {
+    if (!unlockModal) unlockModal = dialogLib.createModal(dom.unlockDialog);
+    if (!decryptFileModal) decryptFileModal = dialogLib.createModal(dom.decryptFileDialog);
+    if (!passkeyModal) passkeyModal = dialogLib.createModal(dom.passkeyDialog);
+  }
 
   /* ------------------------------------------------------------------ *
    * 小工具
@@ -1229,14 +1323,6 @@
     if (globalThis.QingdhAI) QingdhAI.refreshModeLabel();
   }
 
-  function engineHost(engine) {
-    try {
-      return new URL(engineBuild(engine)('q')).hostname.replace(/^www\./, '');
-    } catch (error) {
-      return '';
-    }
-  }
-
   function refreshEngineSelect() {
     if (!dom.setEngine) return;
     dom.setEngine.innerHTML = allEngines()
@@ -1621,6 +1707,7 @@
   }
 
   function openSearchHistory() {
+    ensureDialogs();
     readSearchHistory({ fresh: true });
     renderSearchHistory();
     if (dom.historyDialog && !dom.historyDialog.open) dom.historyDialog.showModal();
@@ -2063,6 +2150,7 @@
   }
 
   function promptPasskey() {
+    ensureDialogs();
     return new Promise((resolve) => {
       if (!passkeySupported() || !sync.user) {
         resolve(false);
@@ -2228,6 +2316,7 @@
 
   // temporary=true 时只借用 dataKey 预览历史密文，不改变当前加密状态。
   function promptUnlock(envelope, { temporary = false } = {}) {
+    ensureDialogs();
     return new Promise((resolve) => {
       if (!globalThis.QingdhCrypto) {
         showToast('当前环境不支持加密，请使用 HTTPS 或 localhost');
@@ -2444,6 +2533,7 @@
   }
 
   function openEncryptDialog() {
+    ensureDialogs();
     if (!sync.user || cryptoState.enabled) return;
     dom.encryptForm.reset();
     dom.encryptError.hidden = true;
@@ -2583,6 +2673,7 @@
   }
 
   function openChangeEncryptionDialog() {
+    ensureDialogs();
     if (!cryptoState.enabled) return;
     dom.changeEncryptionForm.reset();
     dom.changeEncryptionOldField.hidden = false;
@@ -2722,6 +2813,7 @@
   }
 
   function promptDecryptFile(envelope) {
+    ensureDialogs();
     return new Promise((resolve) => {
       decryptFileModal.prompt(resolve, () => {
         cryptoState.fileDecryptEnvelope = envelope;
@@ -2761,6 +2853,7 @@
   }
 
   function openDisableEncryptionDialog() {
+    ensureDialogs();
     if (!sync.user || !cryptoState.enabled) return;
     state.disableBlockingSecrets = [];
     dom.disableEncryptionForm.reset();
@@ -2893,6 +2986,7 @@
   }
 
   function openRotateRecoveryDialog() {
+    ensureDialogs();
     if (!cryptoState.enabled || !cryptoState.envelope) return;
     dom.rotateRecoveryForm.reset();
     dom.rotateRecoveryError.hidden = true;
@@ -2938,6 +3032,7 @@
   }
 
   async function finishRotateRecovery() {
+    ensureDialogs();
     const pending = cryptoState.pendingRecovery;
     if (!pending) return;
     if (!dom.newRecoveryConfirm.checked) {
@@ -3103,6 +3198,7 @@
   }
 
   async function openRevisionsDialog() {
+    ensureDialogs();
     if (!sync.user) {
       showToast('登录后才能查看云端历史版本');
       return;
@@ -3687,6 +3783,7 @@
   }
 
   function openChangeEmailDialog() {
+    ensureDialogs();
     if (!sync.user || !sync.user.emailChangeAvailable) return;
     dom.changeEmailForm.reset();
     dom.changeEmailError.hidden = true;
@@ -3753,6 +3850,7 @@
   }
 
   function openChangePasswordDialog() {
+    ensureDialogs();
     if (!sync.user) return;
     dom.changePasswordForm.reset();
     dom.changePasswordError.hidden = true;
@@ -4294,66 +4392,6 @@
    * 合并
    * ------------------------------------------------------------------ */
 
-  function linkIndexForMerge(doc) {
-    const normalized = normalizeData(doc);
-    const visible = new Map();
-    const deleted = new Set();
-    for (const group of normalized.groups) {
-      for (const link of group.links) {
-        const url = normalizeUrl(link.url);
-        if (!url) continue;
-        const key = url.replace(/\/+$/, '');
-        if (link.deletedAt) {
-          deleted.add(key);
-          continue;
-        }
-        visible.set(key, { title: link.title || url, url, group: group.name });
-      }
-    }
-    return { normalized, visible, deleted };
-  }
-
-  function buildMergeDiff(local, cloud) {
-    const a = linkIndexForMerge(local);
-    const b = linkIndexForMerge(cloud);
-    const diff = {
-      localOnly: [],
-      cloudOnly: [],
-      modified: [],
-      locallyDeleted: [],
-      cloudDeleted: [],
-      localGroups: [],
-      cloudGroups: [],
-      settings: false,
-    };
-    for (const [key, link] of a.visible) {
-      const other = b.visible.get(key);
-      if (!other) {
-        if (b.deleted.has(key)) diff.locallyDeleted.push(link);
-        else diff.localOnly.push(link);
-      } else if (other.title !== link.title || other.group !== link.group) {
-        diff.modified.push({ local: link, cloud: other });
-      }
-    }
-    for (const [key, link] of b.visible) {
-      if (a.visible.has(key)) continue;
-      if (a.deleted.has(key)) diff.cloudDeleted.push(link);
-      else diff.cloudOnly.push(link);
-    }
-    const localGroups = new Set(a.normalized.groups.map((group) => group.name));
-    const cloudGroups = new Set(b.normalized.groups.map((group) => group.name));
-    diff.localGroups = [...localGroups].filter((name) => !cloudGroups.has(name));
-    diff.cloudGroups = [...cloudGroups].filter((name) => !localGroups.has(name));
-    const localSettings = a.normalized.settings;
-    const cloudSettings = b.normalized.settings;
-    diff.settings =
-      localSettings.name !== cloudSettings.name ||
-      localSettings.engine !== cloudSettings.engine ||
-      JSON.stringify(localSettings.customEngines || []) !==
-        JSON.stringify(cloudSettings.customEngines || []);
-    return diff;
-  }
-
   function mergeDiffList(items, formatter, limit = 3) {
     if (!items.length) return '';
     return `<li>${items.slice(0, limit).map(formatter).join('、')}${
@@ -4410,6 +4448,7 @@
   }
 
   function askMerge({ local, cloud }) {
+    ensureDialogs();
     if (state.mergeResolver) settleMerge('later');
 
     const localLinks = new Set(
@@ -4437,123 +4476,6 @@
     state.mergeResolver = null;
     if (dom.mergeDialog.open) dom.mergeDialog.close();
     resolve(choice);
-  }
-
-  function newer(a, b) {
-    return (a.updatedAt || 0) >= (b.updatedAt || 0) ? a : b;
-  }
-
-  function mergeSettings(a, b) {
-    const chosen = newer(a, b);
-    return {
-      name: chosen.name,
-      engine: chosen.engine,
-      customEngines: chosen.customEngines || [],
-      engineOrder: chosen.engineOrder || [],
-      updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0),
-    };
-  }
-
-  function mergeLink(localLink, cloudLink) {
-    const deletedWinner = [localLink, cloudLink].find(
-      (link) => link.deletedAt && link.deletedAt >= newer(localLink, cloudLink).updatedAt
-    );
-    if (deletedWinner) {
-      return { ...deletedWinner, deletedAt: deletedWinner.deletedAt, title: deletedWinner.title || '' };
-    }
-    const winner = newer(localLink, cloudLink);
-    return { ...winner, deletedAt: null };
-  }
-
-  function mergeDocuments(local, cloud) {
-    const a = normalizeData(local);
-    const b = normalizeData(cloud);
-
-    const result = {
-      version: 2,
-      settings: mergeSettings(a.settings, b.settings),
-      groups: [],
-    };
-
-    const order = [];
-    const localById = new Map(a.groups.map((group) => [group.id, group]));
-    const cloudById = new Map(b.groups.map((group) => [group.id, group]));
-
-    a.groups.forEach((group) => order.push(group.id));
-    b.groups.forEach((group) => {
-      if (!localById.has(group.id)) order.push(group.id);
-    });
-
-    for (const id of order) {
-      const localGroup = localById.get(id);
-      const cloudGroup = cloudById.get(id);
-
-      if (!localGroup || !cloudGroup) {
-        result.groups.push(clone(localGroup || cloudGroup));
-        continue;
-      }
-
-      const group = mergeGroup(localGroup, cloudGroup);
-      result.groups.push(group);
-    }
-
-    return result;
-  }
-
-  function mergeGroup(localGroup, cloudGroup) {
-    const newerGroup = newer(localGroup, cloudGroup);
-    const deleted = [localGroup, cloudGroup].find(
-      (group) => group.deletedAt && group.deletedAt >= newerGroup.updatedAt
-    );
-    const base = deleted || newerGroup;
-
-    const linkOrder = [];
-    const localLinks = new Map(localGroup.links.map((link) => [link.id, link]));
-    const cloudLinks = new Map(cloudGroup.links.map((link) => [link.id, link]));
-
-    localGroup.links.forEach((link) => linkOrder.push(link.id));
-    cloudGroup.links.forEach((link) => {
-      if (!localLinks.has(link.id)) linkOrder.push(link.id);
-    });
-
-    const links = [];
-    const seenUrls = new Map();
-
-    for (const id of linkOrder) {
-      const localLink = localLinks.get(id);
-      const cloudLink = cloudLinks.get(id);
-      let merged = localLink && cloudLink ? mergeLink(localLink, cloudLink) : clone(localLink || cloudLink);
-      if (!merged) continue;
-
-      if (!merged.deletedAt) {
-        const key = merged.url;
-        const existing = seenUrls.get(key);
-        if (existing) {
-          if ((merged.updatedAt || 0) > (existing.updatedAt || 0)) {
-            existing.deletedAt = merged.updatedAt || now();
-            existing.updatedAt = merged.updatedAt || now();
-            const index = links.indexOf(existing);
-            if (index !== -1) links[index] = merged;
-            seenUrls.set(key, merged);
-          } else {
-            merged.deletedAt = existing.updatedAt || now();
-            merged.updatedAt = existing.updatedAt || now();
-          }
-        } else {
-          seenUrls.set(key, merged);
-        }
-      }
-
-      links.push(merged);
-    }
-
-    return {
-      id: base.id,
-      name: base.name,
-      links,
-      updatedAt: Math.max(localGroup.updatedAt || 0, cloudGroup.updatedAt || 0),
-      deletedAt: deleted ? deleted.deletedAt : null,
-    };
   }
 
   /* ------------------------------------------------------------------ *
@@ -4602,6 +4524,7 @@
   }
 
   function openLinkDialog({ linkId = null, groupId = null } = {}) {
+    ensureDialogs();
     const found = linkId ? findLink(linkId) : null;
     state.linkEditId = found ? found.link.id : null;
 
@@ -4866,6 +4789,7 @@
    * ------------------------------------------------------------------ */
 
   function openGroupDialog({ groupId = null } = {}) {
+    ensureDialogs();
     const group = groupId ? data.groups.find((item) => item.id === groupId && !item.deletedAt) : null;
     state.groupEditId = group ? group.id : null;
 
@@ -5106,6 +5030,7 @@
   }
 
   function openHub(tab) {
+    ensureDialogs();
     if (!dom.hubDialog.open) dom.hubDialog.showModal();
     setHubTab(tab || 'account');
     requestAnimationFrame(() => dom.hubDialog.focus());
@@ -5120,6 +5045,7 @@
   }
 
   function openAccountDialog() {
+    ensureDialogs();
     if (!authSupported()) {
       showToast('登录需要通过网络访问本页面');
       return;
@@ -5339,6 +5265,7 @@
 
   async function importData(file) {
     if (!file) return;
+    ensureDialogs();
     const request = ++state.jsonImportSeq;
     const sessionSeq = sync.sessionSeq;
     const key = currentKey();
@@ -5488,6 +5415,7 @@
   }
 
   function openBookmarkImport(planned, { duplicates, newLinks, newGroups }) {
+    ensureDialogs();
     if (!dom.bookmarkImportDialog) return;
     const visible = data.groups.filter((group) => !group.deletedAt);
     const usedNames = new Set(visible.map((group) => group.name));
@@ -5646,6 +5574,7 @@
    * ------------------------------------------------------------------ */
 
   function askConfirm({ title = '确认操作', message = '', confirmText = '确定', danger = true }) {
+    ensureDialogs();
     if (confirmResolver) settleConfirm(false);
 
     dom.confirmTitle.textContent = title;
@@ -6254,6 +6183,7 @@
   dom.changePasswordBtn.addEventListener('click', openChangePasswordDialog);
   dom.changePasswordForm.addEventListener('submit', handleChangePassword);
   dom.deleteAccountBtn.addEventListener('click', () => {
+    ensureDialogs();
     dom.deleteError.hidden = true;
     dom.deleteForm.reset();
     dom.deleteDialog.showModal();
@@ -6316,11 +6246,7 @@
     }
   });
 
-  document.querySelectorAll('dialog').forEach((dialog) => {
-    dialog.addEventListener('click', (event) => {
-      if (event.target === dialog) dialog.close();
-    });
-  });
+  bindDialogShells();
 
   function shortcutMatches(event, shortcut) {
     const parts = String(shortcut || '')
@@ -6491,9 +6417,11 @@
     }
 
     if (resetToken) {
+      ensureDialogs();
       state.resetToken = resetToken;
       dom.resetForm.reset();
       dom.resetError.hidden = true;
+      ensureDialogs();
       dom.resetDialog.showModal();
       requestAnimationFrame(() => dom.resetPassword.focus());
     }
@@ -6551,6 +6479,8 @@
   };
   const modulePromises = new Map();
   const wiredModules = new Set();
+  // 这些模块的 UI 里有由 <template> 管理的对话框，加载前必须先注入。
+  const MODULES_WITH_DIALOGS = new Set(['QingdhMemo', 'QingdhPrivacy', 'QingdhCommandPalette', 'QingdhPasskey']);
 
   function loadOptionalModule(name) {
     if (modulePromises.has(name)) return modulePromises.get(name);
@@ -6575,6 +6505,7 @@
   }
 
   function withOptionalModule(name, action) {
+    if (MODULES_WITH_DIALOGS.has(name)) ensureDialogs();
     if (globalThis[name]) {
       wireOptionalModules();
       action();
@@ -6608,7 +6539,6 @@
     refreshEngineSelect();
 
     if (globalThis.QingdhSelect) {
-      QingdhSelect.enhance(dom.linkGroup);
       QingdhSelect.enhance(dom.setDensity);
       QingdhSelect.enhance(dom.setEngine);
       QingdhSelect.enhance(dom.setOpen);

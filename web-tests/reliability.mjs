@@ -35,6 +35,11 @@ async function connect(url) {
     if (msg.id && pending.has(msg.id)) {
       const p = pending.get(msg.id); pending.delete(msg.id);
       msg.error ? p.reject(new Error(JSON.stringify(msg.error))) : p.resolve(msg.result);
+    } else if (msg.method === 'Runtime.exceptionThrown') {
+      const detail = msg.params && msg.params.exceptionDetails;
+      console.error('PAGE EXCEPTION', detail && detail.text, detail && detail.url, detail && detail.lineNumber);
+      const frames = (detail && detail.stackTrace && detail.stackTrace.callFrames) || [];
+      for (const frame of frames.slice(0, 6)) console.error('  at', frame.functionName, frame.url + ':' + (frame.lineNumber + 1));
     } else if (msg.method && listeners.has(msg.method)) {
       for (const fn of listeners.get(msg.method)) fn(msg.params);
     }
@@ -57,6 +62,11 @@ async function main() {
   const tab1 = await connect(BASE + '/');
   await sleep(2200);
 
+  // C4：首屏只保留 hub 对话框，其余 <dialog> 在首次打开时才从模板注入。
+  const lazyDialogs = await tab1.evaluate(`JSON.stringify({dialogs:document.querySelectorAll('dialog').length, templates:document.querySelectorAll('template[data-dialog-template]').length})`);
+  const lazyDialogsInfo = JSON.parse(lazyDialogs.value || '{}');
+  check('C4 dialogs stay inert until first open', lazyDialogsInfo.dialogs === 1 && lazyDialogsInfo.templates >= 20, lazyDialogs.value);
+
   // ---------- A. workspace save race ----------
   const emailA = `race-${Date.now()}@example.com`;
   const setupA = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
@@ -74,6 +84,9 @@ async function main() {
   const hub = await tab1.evaluate(`JSON.stringify((()=>{const d=document.getElementById('hub-dialog');const active=document.querySelector('[data-hub-tab].is-active');return {open:d.open,tab:active&&active.dataset.hubTab,title:document.getElementById('hub-panel-title').textContent};})())`);
   const hubInfo = JSON.parse(hub.value || '{}');
   check('account and settings share one centered hub', hubInfo.open === true && hubInfo.tab === 'account', hub.value);
+  const injected = await tab1.evaluate(`JSON.stringify({dialogs:document.querySelectorAll('dialog').length, templates:document.querySelectorAll('template[data-dialog-template]').length})`);
+  const injectedInfo = JSON.parse(injected.value || '{}');
+  check('C4 first open injects the dialog templates once', injectedInfo.dialogs >= 20 && injectedInfo.templates === 0, injected.value);
 
   // A2：本地实例未配置 SMTP 时，改邮箱入口必须禁用并说明原因。
   const emailEntry = await tab1.evaluate(`JSON.stringify((()=>{const btn=document.getElementById('change-email');return {disabled:btn.disabled, title:btn.title, hintHidden:document.getElementById('email-change-hint').hidden};})())`);
@@ -250,7 +263,8 @@ async function main() {
   await sleep(1500);
   const tab2 = await connect(BASE + '/');
   await sleep(2800);
-  const tab2ready = await tab2.evaluate(`JSON.stringify({status:document.getElementById('sync-badge').dataset.status,enc:document.getElementById('encryption-state').textContent,unlock:document.getElementById('unlock-dialog').open})`);
+  const tab2ready = await tab2.evaluate(`JSON.stringify({status:document.getElementById('sync-badge').dataset.status,enc:document.getElementById('encryption-state').textContent,unlock:Boolean(document.getElementById('unlock-dialog') && document.getElementById('unlock-dialog').open)})`);
+  if (tab2ready.error) console.error('tab2 evaluate error', tab2ready.error);
   check('second tab unlocks from vault', JSON.parse(tab2ready.value||'{}').enc === '已开启', tab2ready.value);
 
   await tab1.evaluate(addLink('FromA', 'https://example.com/from-a'));
@@ -366,7 +380,7 @@ async function main() {
     document.getElementById('account-btn').click(); await sleep(300);
     document.getElementById('logout').click();
     for(let i=0;i<80;i++){await sleep(100);if(document.getElementById('account-guest').hidden===false)break;}
-    return JSON.stringify({label, cached:QingdhSecrets.getCached('ai'), active:QingdhAI.activeLabel(), panel:document.getElementById('ai-panel').hidden, unlock:document.getElementById('unlock-dialog').open});})()`);
+    return JSON.stringify({label, cached:QingdhSecrets.getCached('ai'), active:QingdhAI.activeLabel(), panel:document.getElementById('ai-panel').hidden, unlock:Boolean(document.getElementById('unlock-dialog') && document.getElementById('unlock-dialog').open)});})()`);
   const aiInfo = JSON.parse(ai.value || '{}');
   check('AI config loads while logged in', aiInfo.label === 'DeepSeek', aiInfo.label);
   check('logout clears AI config, key cache and panel', aiInfo.cached === null && aiInfo.active === '' && aiInfo.panel === true, ai.value);
@@ -404,7 +418,8 @@ async function main() {
 
   const tab3 = await connect(BASE + '/');
   await sleep(3000);
-  const tab3Before = await tab3.evaluate(`JSON.stringify({enc:document.getElementById('encryption-state').textContent, unlock:document.getElementById('unlock-dialog').open})`);
+  const tab3Before = await tab3.evaluate(`JSON.stringify({enc:document.getElementById('encryption-state').textContent, unlock:Boolean(document.getElementById('unlock-dialog') && document.getElementById('unlock-dialog').open)})`);
+  if (tab3Before.error) console.error('tab3 before error', tab3Before.error);
 
   const disabled = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
     const userId=${JSON.stringify(setupDInfo.userId || '')};
@@ -446,7 +461,7 @@ async function main() {
   check('A4 disable clears vault and session data key but keeps local cache', disabledInfo.vaultBefore === true && disabledInfo.vaultAfter === false && (disabledInfo.cryptoKeys || []).length === 0 && disabledInfo.localHasGitHub === true && disabledInfo.dialogClosed === true, disabled.value);
 
   await sleep(1800);
-  const tab3After = await tab3.evaluate(`JSON.stringify({enc:document.getElementById('encryption-state').textContent, unlock:document.getElementById('unlock-dialog').open})`);
+  const tab3After = await tab3.evaluate(`JSON.stringify({enc:document.getElementById('encryption-state').textContent, unlock:Boolean(document.getElementById('unlock-dialog') && document.getElementById('unlock-dialog').open)})`);
   const tab3BeforeInfo = JSON.parse(tab3Before.value || '{}');
   const tab3AfterInfo = JSON.parse(tab3After.value || '{}');
   check('A4 broadcast resets other tabs to plaintext', tab3BeforeInfo.enc === '已开启' && tab3AfterInfo.enc === '未开启' && tab3AfterInfo.unlock === false, `${tab3Before.value} -> ${tab3After.value}`);
