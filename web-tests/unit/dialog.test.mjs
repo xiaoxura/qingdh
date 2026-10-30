@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { createModal } = require('../../web/lib/dialog.js');
+const { createModal } = require('../../web/js/lib/dialog.js');
 
 function fakeDialog() {
   const dialog = {

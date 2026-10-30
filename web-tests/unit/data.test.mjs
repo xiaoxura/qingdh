@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const core = require('../../web/lib/core.js');
-const { createDataModel } = require('../../web/lib/data.js');
+const core = require('../../web/js/lib/core.js');
+const { createDataModel } = require('../../web/js/lib/data.js');
 
 const ENGINES = [
   { id: 'bing', name: 'Bing', bang: 'b' },

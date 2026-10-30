@@ -15,7 +15,7 @@ test('passkey capability identifies IP hosts and localhost', async () => {
     value: { credentials: { create() {}, get() {} } },
   });
 
-  require('../../web/passkey.js');
+  require('../../web/js/passkey.js');
   const passkey = globalThis.QingdhPasskey;
 
   assert.equal(passkey.supported(), false);

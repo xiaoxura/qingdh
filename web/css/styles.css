@@ -974,6 +974,16 @@ html[data-sidebar-side="right"] #sidebar-hide svg {
   transition: opacity 0.15s ease;
 }
 
+/* 默认品牌标志：用 mask 跟随当前主题色，四季配色下也能保持一致。 */
+.brand-logo {
+  display: block;
+  width: 90%;
+  height: 90%;
+  background: currentColor;
+  -webkit-mask: url("/assets/logo-mark.png") center / contain no-repeat;
+  mask: url("/assets/logo-mark.png") center / contain no-repeat;
+}
+
 /* 收起时，鼠标移到 Logo 上：Logo 淡出，原位显示展开箭头 */
 .brand-expand {
   position: absolute;

@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 // crypto.js 是 classic script：执行后把 API 挂在 globalThis 上。
-require('../../web/crypto.js');
+require('../../web/js/crypto.js');
 const crypto = globalThis.QingdhCrypto;
 
 const PAYLOAD = {

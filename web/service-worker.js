@@ -8,36 +8,37 @@
 'use strict';
 
 // 每次发布前端资源时递增版本号；新版本安装后等待用户确认再接管。
-const VERSION = '20261030-53';
+const VERSION = '20261030-56';
 const CACHE_NAME = `qingdh-shell-${VERSION}`;
 
 // 导航缓存判定单独成模块，便于 node:test 覆盖（B5）。
-importScripts(`/lib/sw-policy.js?v=${VERSION}`);
+importScripts(`/js/lib/sw-policy.js?v=${VERSION}`);
 const SHELL_PATHS = [
   '/',
   '/index.html',
-  '/boot.js',
-  '/styles.css',
-  '/search.css',
-  '/memo-batch.css',
-  '/select.css',
-  '/lib/core.js',
-  '/lib/store.js',
-  '/lib/render.js',
-  '/lib/data.js',
-  '/lib/engines.js',
-  '/lib/merge.js',
-  '/lib/account.js',
-  '/lib/sync.js',
-  '/lib/crypto-ui.js',
-  '/lib/revisions.js',
-  '/lib/dialog.js',
-  '/lib/sw-policy.js',
-  '/select.js',
-  '/crypto.js',
-  '/device-vault.js',
-  '/secrets.js',
-  '/app.js',
+  '/js/boot.js',
+  '/css/styles.css',
+  '/css/search.css',
+  '/css/memo-batch.css',
+  '/css/select.css',
+  '/js/lib/core.js',
+  '/js/lib/store.js',
+  '/js/lib/render.js',
+  '/js/lib/data.js',
+  '/js/lib/engines.js',
+  '/js/lib/merge.js',
+  '/js/lib/account.js',
+  '/js/lib/sync.js',
+  '/js/lib/crypto-ui.js',
+  '/js/lib/revisions.js',
+  '/js/lib/dialog.js',
+  '/js/lib/sw-policy.js',
+  '/js/select.js',
+  '/js/crypto.js',
+  '/js/device-vault.js',
+  '/js/secrets.js',
+  '/js/lib/events.js',
+  '/js/app.js',
   '/manifest.webmanifest',
   '/favicon.ico',
   '/assets/logo-mark.png',

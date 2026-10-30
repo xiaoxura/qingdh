@@ -1,7 +1,13 @@
-# 氢导航
+<p align="center">
+  <img src="docs/logo.png" width="112" height="112" alt="氢导航 Logo" />
+</p>
 
-[![CI](https://github.com/xiaoxura/qingdh/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaoxura/qingdh/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<h1 align="center">氢导航</h1>
+
+<p align="center">
+  <a href="https://github.com/xiaoxura/qingdh/actions/workflows/ci.yml"><img src="https://github.com/xiaoxura/qingdh/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+</p>
 
 一个简洁的浏览器起始页：快速搜索、快捷方式分组、深浅色与四季配色，可选登录后在多台设备之间同步。
 
@@ -325,7 +331,7 @@ go vet ./...
 go test -race ./...
 CGO_ENABLED=0 go build -trimpath -o /tmp/qingdh ./cmd/qingdh
 
-for f in web/*.js web/lib/*.js; do node --check "$f"; done
+for f in web/js/*.js web/js/lib/*.js; do node --check "$f"; done
 node --test web-tests/unit/*.test.mjs
 node web-tests/reliability.mjs  # 需本地服务 + Chrome，见 web-tests/README.md
 ```
@@ -338,24 +344,41 @@ TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable" 
 
 注意：测试会 `DROP SCHEMA public CASCADE` 重建 schema，请使用专用数据库，不要指向生产库。
 
-前端没有构建步骤。开发时可以设置 `web_dir: "web"` 从磁盘读取 `web/index.html` / `web/app.js` / `web/assets`，改完刷新即可；管理后台同目录。
+前端没有构建步骤。开发时可以设置 `web_dir: "web"` 从磁盘读取 `web/index.html` / `web/js/app.js` / `web/assets`，改完刷新即可；管理后台同目录。
+
+## 品牌与图标
+
+品牌色为深青 `#167079`，图标使用浅青底 `#e3eef0`。`web/assets/logo-mark.png` 是透明背景的标志，侧栏与管理后台通过 CSS `mask` 让它跟随当前主题色；PWA、favicon 与 iOS 图标都由同一份 Logo 生成：
+
+| 文件 | 用途 |
+| --- | --- |
+| `web/assets/icon-192.png` / `web/assets/icon-512.png` | PWA 与普通站点图标 |
+| `web/assets/icon-maskable-512.png` | Android maskable 图标（已留出安全区） |
+| `web/assets/apple-touch-icon.png` | iOS 主屏图标 |
+| `web/favicon.ico` / `web/assets/favicon-32.png` | 浏览器标签页 |
+| `web/assets/logo-mark.png` | 界面内默认品牌标志（随主题着色） |
+| `docs/logo.png` | README 展示用圆角标志 |
+
+站点名称和自定义 Logo 仍可在 `/admin` 的「站点」设置里覆盖；不配置时使用这套默认品牌图标。
 
 ## 文件结构
 
 ```text
 qingdh/
 ├── web/                                             # 前端（go:embed 根目录）
-│   ├── index.html / boot.js / styles.css / app.js   # 用户端页面
-│   ├── select.js / select.css                       # 自定义下拉框（保留原生 select）
-│   ├── crypto.js                                    # 客户端加密（v3 工作区 + v4 secrets）
-│   ├── device-vault.js / passkey.js                 # 本机记住解锁 / WebAuthn 门禁
-│   ├── secrets.js                                   # /secrets 同步与冲突处理
-│   ├── memo.js / ai.js / privacy.js                 # 备忘录 / AI / 隐私空间
-│   ├── command-palette.js / bookmarks.js            # 命令面板 / 书签导入
-│   ├── avatars.js                                   # DiceBear Thumbs 头像库（CC0，预渲染）
-│   ├── pwa.js / manifest.webmanifest / service-worker.js / assets/
-│   ├── admin.html / admin.js / admin.css            # 管理后台
-│   └── lib/                                         # 纯函数/存储/渲染/数据模型（浏览器 + node:test 共用）
+│   ├── index.html / admin.html                      # 用户端 / 管理后台页面
+│   ├── manifest.webmanifest / service-worker.js     # PWA（SW 必须在根作用域）
+│   ├── js/                                          # 所有浏览器脚本
+│   │   ├── boot.js / app.js / admin.js              # 首屏主题 / 用户端入口 / 后台入口
+│   │   ├── select.js / crypto.js / secrets.js       # 下拉框 / 加密 / secrets 同步
+│   │   ├── device-vault.js / passkey.js             # 本机记住解锁 / WebAuthn
+│   │   ├── memo.js / ai.js / privacy.js             # 备忘录 / AI / 隐私空间
+│   │   ├── command-palette.js / bookmarks.js        # 命令面板 / 书签导入
+│   │   ├── avatars.js / pwa.js                      # 头像库 / PWA 注册
+│   │   └── lib/                                     # 同步/账号/加密/设置/渲染等模块
+│   ├── css/                                         # styles / admin / select / search / memo-batch
+│   ├── assets/                                      # 品牌图标与 PWA 图标
+│   └── favicon.ico
 ├── assets.go                                        # go:embed web/ 入口
 ├── config.example.yml                               # 启动配置示例
 ├── cmd/qingdh/                                      # serve / migrate / user / admin
@@ -368,7 +391,7 @@ qingdh/
 │   ├── docval/       # 导航数据校验
 │   └── mail/         # SMTP 与邮件模板
 ├── migrations/       # 内嵌 SQL 迁移
-├── docs/             # 截图、后端设计与加密设计
+├── docs/             # 截图、Logo 与设计文档
 └── Dockerfile        # 可选
 ```
 

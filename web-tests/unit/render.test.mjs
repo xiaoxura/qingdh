@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const core = require('../../web/lib/core.js');
-const { createRenderer } = require('../../web/lib/render.js');
+const core = require('../../web/js/lib/core.js');
+const { createRenderer } = require('../../web/js/lib/render.js');
 
 function makeRenderer({ prefs = {}, state = {} } = {}) {
   return createRenderer({

@@ -336,8 +336,8 @@ async function main() {
     const cache=keys.length?await caches.open(keys[0]):null;
     return JSON.stringify({
       supported:true, ready:true, keys,
-      appCached:cache?Boolean(await cache.match('/app.js', {ignoreSearch:true})):false,
-      avatarCached:cache?Boolean(await cache.match('/avatars.js', {ignoreSearch:true})):false,
+      appCached:cache?Boolean(await cache.match('/js/app.js', {ignoreSearch:true})):false,
+      avatarCached:cache?Boolean(await cache.match('/js/avatars.js', {ignoreSearch:true})):false,
       apiCached:cache?Boolean(await cache.match('/api/v1/workspace')):false,
       adminCached:cache?Boolean(await cache.match('/admin')):false,
     });})()`);

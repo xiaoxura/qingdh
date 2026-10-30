@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { createStorage } = require('../../web/lib/store.js');
+const { createStorage } = require('../../web/js/lib/store.js');
 
 function fakeStorage() {
   const map = new Map();

@@ -480,11 +480,15 @@
     document.title = `管理后台 · ${name || '氢导航'}`;
     const mark = document.querySelector('.brand-mark');
     if (mark) {
-      if (logo) {
+      const hasLogo = Boolean(logo);
+      mark.classList.toggle('has-image', hasLogo);
+      if (hasLogo) {
+        mark.innerHTML = '';
         mark.style.backgroundImage = `url("${String(logo).replace(/"/g, '')}")`;
         mark.style.backgroundSize = 'cover';
         mark.style.backgroundPosition = 'center';
       } else {
+        mark.innerHTML = '<span class="brand-logo"></span>';
         mark.style.backgroundImage = '';
         mark.style.backgroundSize = '';
         mark.style.backgroundPosition = '';
@@ -494,13 +498,12 @@
 
   function renderSiteLogo() {
     if (!dom.siteLogoPreview) return;
-    const name = (dom.siteName.value.trim() || '氢导航').slice(0, 1);
     if (state.siteLogo) {
       dom.siteLogoPreview.classList.add('has-image');
       dom.siteLogoPreview.innerHTML = `<img src="${escapeAttr(state.siteLogo)}" alt="" />`;
     } else {
       dom.siteLogoPreview.classList.remove('has-image');
-      dom.siteLogoPreview.textContent = name;
+      dom.siteLogoPreview.innerHTML = '<span class="brand-logo"></span>';
     }
   }
 

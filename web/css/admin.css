@@ -266,7 +266,7 @@ button {
 
 .brand {
   display: inline-flex;
-  gap: 10px;
+  gap: 11px;
   align-items: center;
   align-self: flex-start;
   padding: 4px 6px;
@@ -278,14 +278,29 @@ button {
 }
 
 .brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: var(--accent);
+  display: grid;
+  width: 32px;
+  height: 32px;
+  color: var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  place-items: center;
+}
+
+.brand-logo {
+  display: block;
+  background: currentColor;
+  -webkit-mask: url("/assets/logo-mark.png") center / contain no-repeat;
+  mask: url("/assets/logo-mark.png") center / contain no-repeat;
+}
+
+.brand-mark .brand-logo {
+  width: 90%;
+  height: 90%;
 }
 
 .brand-name {
-  font-size: 14.5px;
+  font-size: 16px;
   font-weight: 650;
 }
 
@@ -1918,8 +1933,8 @@ html[data-theme="dark"] .toast {
   overflow: hidden;
   font-size: 22px;
   font-weight: 650;
-  color: #fff;
-  background: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
   border-radius: 14px;
   place-items: center;
 }
@@ -1928,6 +1943,11 @@ html[data-theme="dark"] .toast {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.site-logo-preview .brand-logo {
+  width: 72%;
+  height: 72%;
 }
 
 .site-logo-controls {

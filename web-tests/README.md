@@ -8,7 +8,7 @@
 4. **账号切换**：AI 配置加载后退出，确认配置、密钥缓存、答案面板全部清理。
 5. **PWA 缓存边界**：确认使用版本化 app shell 缓存，且 `/api/`、`/admin` 永不进入 Cache Storage。
 6. **懒加载与备忘录**：首屏后动态加载备忘录模块，验证列表搜索，以及 pagehide 时防抖中的正文会被立即提交。
-7. **纯函数单测**：`node --test web-tests/unit/*.test.mjs` 覆盖 `lib/core.js` 的 URL 校验、转义、时间戳和 favicon 代理地址。
+7. **纯函数单测**：`node --test web-tests/unit/*.test.mjs` 覆盖 `js/lib/core.js` 的 URL 校验、转义、时间戳和 favicon 代理地址。
 
 ## 前置条件
 

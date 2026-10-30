@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const core = require('../../web/lib/core.js');
+const core = require('../../web/js/lib/core.js');
 
 test('escapeHTML escapes every dangerous character', () => {
   assert.equal(core.escapeHTML(`<a href="x">&'`), '&lt;a href=&quot;x&quot;&gt;&amp;&#39;');

@@ -38,7 +38,7 @@ go vet ./...
 go test -race ./...
 CGO_ENABLED=0 go build -trimpath -o /tmp/qingdh ./cmd/qingdh
 
-for f in web/*.js web/lib/*.js; do node --check "$f"; done
+for f in web/js/*.js web/js/lib/*.js; do node --check "$f"; done
 node --test web-tests/unit/*.test.mjs
 ```
 
@@ -55,7 +55,7 @@ node web-tests/reliability.mjs
 - 后端保持标准库 `net/http`，不要为了小功能引入框架。
 - SQL 集中在 `internal/store/`，迁移按 `migrations/NNNN_*.sql` 递增。
 - 新的运行时设置优先放 `settings` 表，启动必需项才放 `config.yml`。
-- 前端使用原生 HTML/CSS/JS；共享纯函数放 `web/lib/core.js`，并补 `node:test`。
+- 前端使用原生 HTML/CSS/JS；共享纯函数放 `web/js/lib/core.js`，并补 `node:test`。
 - 用户可见文案使用中文；日期、时间和错误提示保持和现有风格一致。
 - 不要提交 `config.yml`、`TEST_ACCOUNTS.md`、数据库密码、API Key、SMTP 凭据或本地日志。
 

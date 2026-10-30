@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const policy = require('../../web/lib/sw-policy.js');
+const policy = require('../../web/js/lib/sw-policy.js');
 
 test('B5 only real shell entry points may replace the offline shell', () => {
   for (const path of ['/', '/index.html', '/ai', '/ai/']) {

@@ -21,7 +21,7 @@ node --test web-tests/unit/*.test.mjs
 
 1. **后端基础扎实**：路由、中间件、限流、加密边界和测试都在水平线以上，已有约 85 个 Go 测试覆盖注册、会话、同步、secret、AI 代理与后台。
 2. **产品生命周期有缺口**：没有登录态改密 / 换邮箱入口；加密恢复码只能生成一次；服务端没有导航文档历史；审计日志只写不读。
-3. **前端开始成为瓶颈**：`web/app.js` 已 6333 行、约 60 个可变全局状态，并存在几个已确认的数据正确性问题。继续在单文件里堆账号与加密 UI，风险会持续上升。
+3. **前端开始成为瓶颈**：`web/js/app.js` 已 6333 行、约 60 个可变全局状态，并存在几个已确认的数据正确性问题。继续在单文件里堆账号与加密 UI，风险会持续上升。
 
 因此本阶段不从“再加一个入口”开始，而是把**账号、密钥、数据三件事补成可长期托付的闭环**。
 
@@ -235,8 +235,8 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 
 | ID | 问题 | 证据 | 修法 | 回归 |
 | --- | --- | --- | --- | --- |
-| B1 | 超出限额时保留**最旧**数据，且后面分组会饿死 | `web/app.js` `enforceLimits`：按 `updatedAt` 升序 `slice(0, MAX_GROUPS)`；链接预算跨组累加 | 墓碑优先丢、新者优先；每组配额；与注释一致 | 单测：51 个分组/501 条链接，保留最新 |
-| B2 | 自定义搜索引擎无法被选中 | `web/app.js` `selectEngine` 只校验内置 `ENGINES`，但菜单用 `allEngines()` 渲染 | 改为 `allEngines().some(...)`；补 e2e | 添加自定义引擎后可从菜单选中并搜索 |
+| B1 | 超出限额时保留**最旧**数据，且后面分组会饿死 | `web/js/app.js` `enforceLimits`：按 `updatedAt` 升序 `slice(0, MAX_GROUPS)`；链接预算跨组累加 | 墓碑优先丢、新者优先；每组配额；与注释一致 | 单测：51 个分组/501 条链接，保留最新 |
+| B2 | 自定义搜索引擎无法被选中 | `web/js/app.js` `selectEngine` 只校验内置 `ENGINES`，但菜单用 `allEngines()` 渲染 | 改为 `allEngines().some(...)`；补 e2e | 添加自定义引擎后可从菜单选中并搜索 |
 | B3 | 关闭“自动同步”后仍会在 focus/切标签/联网时同步 | 开关只挡 `scheduleSync`；focus/visibility/online 直接 `syncNow()` | 事件侧或 `syncNow` 统一判断 `prefs.autoSync`；手动同步不受影响 | 关闭开关后编辑不自动上传，手动同步仍可用 |
 | B4 | 对话框 resolver 并发会永久悬挂 | `promptDecryptFile` 第二次调用 resolve 新 Promise；`promptUnlock` 覆盖前不 settle，且可能重复 `showModal()` | 抽 `openModal(dialog, resolve)`：先 settle 旧值，再判 `dialog.open` | 并发触发两个解锁/导入流程，均能结束 |
 | B5 | Service Worker 把任意导航响应写成 shell | `web/service-worker.js` 所有 `navigate` 都 `cache.put('/index.html')` | 只允许 `/`、`/index.html`、`/ai` 写入；其余导航不缓存 | 访问 404 后离线打开仍是正常 shell |
@@ -258,9 +258,9 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 
 不改协议、不引框架，只划边界：
 
-- `web/lib/store.js`：`data` / `prefs` / `sync` 三片状态 + 订阅，替代散装全局。
-- `web/lib/dialog.js`：统一 `openModal` / `settle` 帮助函数，顺带修 B4。
-- `web/lib/render.js`：分组列表单一渲染 + 行级 patch，替代 8 条并行渲染路径。
+- `web/js/lib/store.js`：`data` / `prefs` / `sync` 三片状态 + 订阅，替代散装全局。
+- `web/js/lib/dialog.js`：统一 `openModal` / `settle` 帮助函数，顺带修 B4。
+- `web/js/lib/render.js`：分组列表单一渲染 + 行级 patch，替代 8 条并行渲染路径。
 - 保持 classic script + `globalThis.QingdhApp` 命名空间，零构建不变。
 - 目标：6.3k 行降到 3–4 个 500–1500 行模块；行为不变，现有测试全绿。
 
@@ -269,7 +269,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 - `web-tests/unit/crypto.test.mjs`：错误密码、恢复码、rewrap、AAD/kind 混淆、篡改密文、A3 新恢复码。
 - Go revision 并发测试：N=8 同时 `PUT /workspace` 使用同一 `baseRevision`，断言恰好 1 个 200、其余 409、最终 revision=1、无 5xx。
 - 补缺失接口的成功路径：`/auth/refresh`、`/auth/sessions` 列表、`/auth/logout-all`、`/account/export`。
-- 把 B1/B3 等纯逻辑抽到 `web/lib/` 后做表驱动测试。
+- 把 B1/B3 等纯逻辑抽到 `web/js/lib/` 后做表驱动测试。
 
 ### C3 同步效率
 
@@ -362,9 +362,9 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | 文档同步 | `internal/httpapi/workspace_handlers.go`、`internal/store/documents.go` |
 | v3/v4 校验 | `internal/docval/validate.go`、`internal/docval/secrets.go` |
 | 客户端加密 | `web/crypto.js`、`web/device-vault.js` |
-| 设置 Hub | `web/index.html`、`web/app.js` |
+| 设置 Hub | `web/index.html`、`web/js/app.js` |
 | 审计 | `internal/httpapi/audit.go`、`internal/store/audit.go`、`migrations/0007_audit_log.sql` |
-| 后台 | `web/admin.html`、`web/admin.js`、`internal/httpapi/admin_handlers.go` |
+| 后台 | `web/admin.html`、`web/js/admin.js`、`internal/httpapi/admin_handlers.go` |
 | 回归 | `web-tests/reliability.mjs`、`web-tests/unit/` |
 
 ## 11. 实施进度
@@ -373,11 +373,11 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 
 | 工作项 | 状态 | 验证 | 备注 |
 | --- | --- | --- | --- |
-| B1 限额保留策略 | 已完成 | `node --test web-tests/unit/core.test.mjs`（含 51 组/501 链接、公平配额、墓碑优先） | `enforceLimits` 抽到 `web/lib/core.js` |
+| B1 限额保留策略 | 已完成 | `node --test web-tests/unit/core.test.mjs`（含 51 组/501 链接、公平配额、墓碑优先） | `enforceLimits` 抽到 `web/js/lib/core.js` |
 | B2 自定义搜索引擎 | 已完成 | `web-tests/reliability.mjs`（新增自定义引擎后可从菜单选中） | `selectEngine` 改用 `allEngines()` |
 | B3 自动同步开关 | 已完成 | `core.test.mjs` 表驱动 + `reliability.mjs`（关闭后编辑保持 dirty，手动同步上传） | `syncNow` 统一判断，用户操作走 `manual: true` |
-| B4 对话框 resolver 并发 | 已完成 | `web-tests/unit/dialog.test.mjs`（重复调用结算旧值、不重复 showModal、可重开） | 新增 `web/lib/dialog.js`，解锁/导入解密/Passkey 统一使用 |
-| B5 Service Worker 导航缓存 | 已完成 | `sw-policy.test.mjs`（仅 `/`、`/index.html`、`/ai` 可写入 shell） | 新增 `web/lib/sw-policy.js`，SW 通过 `importScripts` 复用 |
+| B4 对话框 resolver 并发 | 已完成 | `web-tests/unit/dialog.test.mjs`（重复调用结算旧值、不重复 showModal、可重开） | 新增 `web/js/lib/dialog.js`，解锁/导入解密/Passkey 统一使用 |
+| B5 Service Worker 导航缓存 | 已完成 | `sw-policy.test.mjs`（仅 `/`、`/index.html`、`/ai` 可写入 shell） | 新增 `web/js/lib/sw-policy.js`，SW 通过 `importScripts` 复用 |
 | B6 桌面侧栏 hidden 焦点 | 已完成 | `reliability.mjs`（hidden 时 `inert`、`aria-hidden=true`，展开后恢复） | 桌面 hidden 也设 `inert`，焦点移到唤出按钮 |
 | B7 会话续期失败降级 | 已完成 | `TestRenewalFailureDoesNotRejectRequest`（触发器模拟续期写库失败，请求仍 200；恢复后续期继续） | `Authenticate` 不再向中间件返回续期错误 |
 | B8 workspace 缺失行自愈 | 已完成 | `TestWorkspaceRecoversMissingRow`（删行后 PUT 重建 revision 1；非 0 base 仍 409） | `UpdateDocument` 对齐 `PutSecret` |
@@ -389,7 +389,7 @@ GET /api/v1/admin/audit?limit=50&offset=0&action=admin.user.update&actor=
 | A5 服务端版本历史 | 已完成 | 迁移 0010；`TestWorkspaceRevisions*`（成功写入才记录、409/跨用户、v3 保留、20 份/30 天、级联删除、8 并发仅 1 成功）+ `TestWorkspaceConcurrentPutsUseSingleRevision`；`reliability.mjs` 预览/恢复/快照；加密历史预览手工验证 | 新增 `/workspace/revisions` 两个只读接口；恢复复用 PUT，不新增恢复接口 |
 | A6 审计日志后台 | 已完成 | 迁移 0011；`TestAdminAudit*`（403、分页/动作/操作者筛选、删除管理员后 actor_email 保留、不泄露密文/密码/Key） | 新增 `GET /admin/audit` 与后台「审计」分类 |
 | A7 发布收口 | 已完成（本地范围） | `qingdh version` = v0.1.0；linux/amd64 + arm64 静态构建成功；管理后台显示 `serverVersion`；README 增加升级/回滚；迁移 0009–0011 在空库与已有库顺序执行 | 按任务约束未添加 release workflow、未打 tag、未推送镜像/远端 |
-| C1 拆分 app.js | 部分完成（持续推进） | 新增 `lib/sync.js`、`lib/account.js`、`lib/crypto-ui.js`、`lib/settings.js`、`lib/revisions.js`、`lib/merge.js`、`lib/engines.js`、`lib/data.js`、`lib/render.js`、`lib/store.js`、`lib/dialog.js`、`lib/sw-policy.js`；app.js 6.6k → 3.85k，剩余常量/DOM/状态/存储/渲染/搜索/事件绑定/启动；设置 Hub 也改为首次打开时加载 | 同步、账号、加密三大块一次性出离；浏览器回归 36 项覆盖登录、加密、冲突、历史与 A4 |
+| C1 拆分 app.js | 部分完成（持续推进） | 新增 `web/js/lib/sync.js`、`account.js`、`crypto-ui.js`、`events.js`、`settings.js`、`revisions.js` 等；`web/js/app.js` 6.6k → 3.26k，剩余常量/DOM/状态/存储/渲染/搜索/启动；设置 Hub 首次打开时加载 | 同步、账号、加密、事件绑定一次性出离；前端目录整理为 `js/`、`js/lib/`、`css/`、`assets/` |
 | C2 补测试 | 已完成 | `web-tests/unit/*.test.mjs` 45 项（crypto/rewrap/AAD、limits、dialog、store、render、data、sw-policy、focus 节流）；Go 版本并发、`/auth/refresh`、`/auth/sessions`、`/auth/logout-all`、`/account/export` 成功路径 | |
 | C3 同步效率 | 已完成 | `TestWorkspaceConditionalGet`/`TestSecretConditionalGet`/`TestSiteConditionalGet`；focus 30s 节流单测；memo 1.6s/5s；实测 workspace 2,314 B → 条件请求 304 / 0 B；site Logo 基于 settings version 的 ETag | workspace/secrets/site 支持 304；reconcile 单飞；加密账号首拉仍取 envelope |
-| C4 首屏瘦身 | 已完成（两步） | 可选模块按首次使用加载，SW 不再预缓存可选模块；26 个对话框移入 `<template>`，首次打开任意对话框时一次性注入并重放监听器；首屏代码 gzip 152.8 KiB → 96.9 KiB（头像库登录后加载，设置 Hub 首次打开时加载）；`reliability.mjs` 断言首屏仅 1 个 dialog、注入后模板清空 | 26 个对话框首次打开时一次性注入；hub 对话框保持常驻；头像库、设置 Hub 均按需加载 |
+| C4 首屏瘦身 | 已完成（两步） | 可选模块按首次使用加载，SW 不再预缓存可选模块；26 个对话框移入 `<template>`，首次打开任意对话框时一次性注入并重放监听器；首屏代码 gzip 152.8 KiB → 99.2 KiB（头像库、设置 Hub 均按需加载）；`reliability.mjs` 断言首屏仅 1 个 dialog、注入后模板清空 | 26 个对话框首次打开时一次性注入；hub 对话框保持常驻；头像库、设置 Hub 均按需加载 |
