@@ -3422,6 +3422,10 @@
   }
 
   function updateAccountUI() {
+    // 头像库只在登录后需要；首屏游客不下载，登录后按需加载再刷新头像。
+    if (sync.user && !globalThis.QingdhAvatars) {
+      withOptionalModule('QingdhAvatars', () => updateAccountUI());
+    }
     updateSyncUI();
     showAccountView(Boolean(sync.user));
   }
@@ -6476,6 +6480,7 @@
     QingdhPasskey: 'passkey.js',
     QingdhBookmarks: 'bookmarks.js',
     QingdhPWA: 'pwa.js',
+    QingdhAvatars: 'avatars.js',
   };
   const modulePromises = new Map();
   const wiredModules = new Set();

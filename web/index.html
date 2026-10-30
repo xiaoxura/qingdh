@@ -10,11 +10,11 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="assets/icon-192.png" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f6bf5'/%3E%3Cpath d='M20 41c0-9 5.4-16 12-16s12 7 12 16' fill='none' stroke='%23fff' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='46' r='2.6' fill='%23fff'/%3E%3C/svg%3E" />
-  <script src="boot.js?v=20261029-45"></script>
-  <link rel="stylesheet" href="styles.css?v=20261029-45" />
-  <link rel="stylesheet" href="search.css?v=20261029-45" />
-  <link rel="stylesheet" href="memo-batch.css?v=20261029-45" />
-  <link rel="stylesheet" href="select.css?v=20261029-45" />
+  <script src="boot.js?v=20261029-46"></script>
+  <link rel="stylesheet" href="styles.css?v=20261029-46" />
+  <link rel="stylesheet" href="search.css?v=20261029-46" />
+  <link rel="stylesheet" href="memo-batch.css?v=20261029-46" />
+  <link rel="stylesheet" href="select.css?v=20261029-46" />
 </head>
 <body>
   <div class="bg" aria-hidden="true"></div>
@@ -358,8 +358,7 @@
   </section>
 
   <!-- 快速记录 -->
-  <template data-dialog-template="memo-capture-dialog">
-<dialog id="memo-capture-dialog" aria-labelledby="memo-capture-title">
+  <template data-dialog-template="memo-capture-dialog"><dialog id="memo-capture-dialog" aria-labelledby="memo-capture-title">
     <div class="dialog-head">
       <h2 id="memo-capture-title">快速记录</h2>
       <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
@@ -376,8 +375,7 @@
       <button class="btn" type="button" data-close-dialog>取消</button>
       <button class="btn btn-primary" id="memo-capture-save" type="button">保存</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 隐私空间 -->
   <section class="privacy-view" id="privacy-view" hidden aria-label="隐私空间">
@@ -429,8 +427,7 @@
   </section>
 
   <!-- 添加 / 编辑快捷方式 -->
-  <template data-dialog-template="link-dialog">
-<dialog id="link-dialog" aria-labelledby="link-dialog-title">
+  <template data-dialog-template="link-dialog"><dialog id="link-dialog" aria-labelledby="link-dialog-title">
     <form id="link-form" novalidate>
       <div class="dialog-head">
         <h2 id="link-dialog-title">添加快捷方式</h2>
@@ -465,12 +462,10 @@
         <button class="btn btn-primary" id="link-submit" type="submit">保存</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 新建 / 重命名分组 -->
-  <template data-dialog-template="bookmark-import-dialog">
-<dialog id="bookmark-import-dialog" class="bookmark-import-dialog" aria-labelledby="bookmark-import-title">
+  <template data-dialog-template="bookmark-import-dialog"><dialog id="bookmark-import-dialog" class="bookmark-import-dialog" aria-labelledby="bookmark-import-title">
     <div class="dialog-head">
       <h2 id="bookmark-import-title">预览书签导入</h2>
       <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
@@ -487,11 +482,9 @@
       <button class="btn" type="button" data-close-dialog>取消</button>
       <button class="btn btn-primary" id="bookmark-import-ok" type="button">导入</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
-  <template data-dialog-template="engine-add-dialog">
-<dialog id="engine-add-dialog" class="engine-add-dialog" aria-labelledby="engine-add-title">
+  <template data-dialog-template="engine-add-dialog"><dialog id="engine-add-dialog" class="engine-add-dialog" aria-labelledby="engine-add-title">
     <div class="dialog-head">
       <h2 id="engine-add-title">新增搜索引擎</h2>
       <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
@@ -520,11 +513,9 @@
       <button class="btn" type="button" data-close-dialog>取消</button>
       <button class="btn btn-primary" id="engine-add-btn" type="button">添加搜索引擎</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
-  <template data-dialog-template="group-dialog">
-<dialog id="group-dialog" aria-labelledby="group-dialog-title">
+  <template data-dialog-template="group-dialog"><dialog id="group-dialog" aria-labelledby="group-dialog-title">
     <form id="group-form">
       <div class="dialog-head">
         <h2 id="group-dialog-title">新建分组</h2>
@@ -545,13 +536,11 @@
         <button class="btn btn-primary" type="submit">保存</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 设置 -->
     <!-- 设置与账号：左侧菜单 + 右侧内容 -->
-  <template data-dialog-template="history-dialog">
-<dialog id="history-dialog" class="history-dialog" aria-labelledby="history-dialog-title">
+  <template data-dialog-template="history-dialog"><dialog id="history-dialog" class="history-dialog" aria-labelledby="history-dialog-title">
     <div class="dialog-head">
       <div>
         <h2 id="history-dialog-title">搜索历史</h2>
@@ -581,8 +570,7 @@
         <button class="btn" type="button" data-close-dialog>关闭</button>
       </div>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <dialog id="hub-dialog" class="hub-dialog" aria-labelledby="hub-title" tabindex="-1">
     <div class="hub-shell">
@@ -999,8 +987,7 @@
     </div>
   </dialog>
 
-  <template data-dialog-template="json-import-dialog">
-<dialog id="json-import-dialog" class="bookmark-import-dialog" aria-labelledby="json-import-title">
+  <template data-dialog-template="json-import-dialog"><dialog id="json-import-dialog" class="bookmark-import-dialog" aria-labelledby="json-import-title">
     <div class="dialog-head">
       <h2 id="json-import-title">预览 JSON 导入</h2>
       <button class="icon-close" type="button" data-close-dialog aria-label="关闭">×</button>
@@ -1019,13 +1006,11 @@
       <button class="btn" type="button" data-close-dialog>取消</button>
       <button class="btn btn-primary" id="json-import-ok" type="button">合并导入</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
 
   <!-- Passkey 本地解锁 -->
-  <template data-dialog-template="passkey-dialog">
-<dialog id="passkey-dialog" aria-labelledby="passkey-title">
+  <template data-dialog-template="passkey-dialog"><dialog id="passkey-dialog" aria-labelledby="passkey-title">
     <div class="dialog-head">
       <h2 id="passkey-title">使用生物识别解锁</h2>
     </div>
@@ -1037,12 +1022,10 @@
       <button class="btn" id="passkey-use-password" type="button">改用密码</button>
       <button class="btn btn-primary" id="passkey-verify" type="button">使用生物识别</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 命令面板 -->
-  <template data-dialog-template="command-dialog">
-<dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title" tabindex="-1">
+  <template data-dialog-template="command-dialog"><dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title" tabindex="-1">
     <h2 class="command-sr-title" id="command-title">命令面板</h2>
     <div class="command-head">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -1054,12 +1037,10 @@
     </div>
     <div class="command-list" id="command-list" role="listbox" aria-label="命令结果"></div>
     <p class="command-hint">↑↓ 选择 · Enter 执行 · Esc 关闭</p>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 隐私空间锁屏 -->
-  <template data-dialog-template="privacy-lock-dialog">
-<dialog id="privacy-lock-dialog" aria-labelledby="privacy-lock-title" tabindex="-1">
+  <template data-dialog-template="privacy-lock-dialog"><dialog id="privacy-lock-dialog" aria-labelledby="privacy-lock-title" tabindex="-1">
     <form id="privacy-lock-form" novalidate>
       <div class="dialog-head">
         <h2 id="privacy-lock-title">隐私空间</h2>
@@ -1096,12 +1077,10 @@
         <button class="btn btn-primary" id="privacy-submit" type="submit">解锁</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 隐私空间恢复码（创建时必须保存） -->
-  <template data-dialog-template="privacy-recovery-dialog">
-<dialog id="privacy-recovery-dialog" aria-labelledby="privacy-recovery-title">
+  <template data-dialog-template="privacy-recovery-dialog"><dialog id="privacy-recovery-dialog" aria-labelledby="privacy-recovery-title">
     <div class="dialog-head">
       <h2 id="privacy-recovery-title">保存隐私空间恢复码</h2>
     </div>
@@ -1121,15 +1100,13 @@
     <div class="dialog-foot">
       <button class="btn btn-primary" id="privacy-recovery-continue" type="button" disabled>完成</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- AI 配置 -->
 
 
   <!-- 通用确认框 -->
-  <template data-dialog-template="confirm-dialog">
-<dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <template data-dialog-template="confirm-dialog"><dialog id="confirm-dialog" aria-labelledby="confirm-title">
     <div class="dialog-head">
       <h2 id="confirm-title">确认操作</h2>
     </div>
@@ -1140,16 +1117,14 @@
       <button class="btn" id="confirm-cancel" type="button">取消</button>
       <button class="btn btn-danger" id="confirm-ok" type="button">删除</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
 
   <!-- 账号 -->
 
 
   <!-- 开启加密 -->
-  <template data-dialog-template="encrypt-dialog">
-<dialog id="encrypt-dialog" aria-labelledby="encrypt-title">
+  <template data-dialog-template="encrypt-dialog"><dialog id="encrypt-dialog" aria-labelledby="encrypt-title">
     <form id="encrypt-form" novalidate>
       <div class="dialog-head">
         <h2 id="encrypt-title">开启数据加密</h2>
@@ -1176,12 +1151,10 @@
         <button class="btn btn-primary" id="encrypt-submit" type="submit">下一步</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 恢复码 -->
-  <template data-dialog-template="recovery-dialog">
-<dialog id="recovery-dialog" aria-labelledby="recovery-title">
+  <template data-dialog-template="recovery-dialog"><dialog id="recovery-dialog" aria-labelledby="recovery-title">
     <div class="dialog-head">
       <h2 id="recovery-title">保存恢复码</h2>
     </div>
@@ -1202,12 +1175,10 @@
       <button class="btn" type="button" data-close-dialog>取消</button>
       <button class="btn btn-primary" id="recovery-continue" type="button" disabled>完成加密</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 解锁云端数据 -->
-  <template data-dialog-template="unlock-dialog">
-<dialog id="unlock-dialog" aria-labelledby="unlock-title">
+  <template data-dialog-template="unlock-dialog"><dialog id="unlock-dialog" aria-labelledby="unlock-title">
     <form id="unlock-form" novalidate>
       <div class="dialog-head">
         <h2 id="unlock-title">解锁云端数据</h2>
@@ -1238,12 +1209,10 @@
         <button class="btn btn-primary" id="unlock-submit" type="submit">解锁</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 关闭数据加密 -->
-  <template data-dialog-template="disable-encryption-dialog">
-<dialog id="disable-encryption-dialog" aria-labelledby="disable-encryption-title">
+  <template data-dialog-template="disable-encryption-dialog"><dialog id="disable-encryption-dialog" aria-labelledby="disable-encryption-title">
     <form id="disable-encryption-form" novalidate>
       <div class="dialog-head">
         <h2 id="disable-encryption-title">关闭数据加密</h2>
@@ -1282,12 +1251,10 @@
         <button class="btn btn-danger" id="disable-encryption-submit" type="submit">关闭加密</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 重新生成恢复码：验证当前密码 -->
-  <template data-dialog-template="rotate-recovery-dialog">
-<dialog id="rotate-recovery-dialog" aria-labelledby="rotate-recovery-title">
+  <template data-dialog-template="rotate-recovery-dialog"><dialog id="rotate-recovery-dialog" aria-labelledby="rotate-recovery-title">
     <form id="rotate-recovery-form" novalidate>
       <div class="dialog-head">
         <h2 id="rotate-recovery-title">重新生成恢复码</h2>
@@ -1310,12 +1277,10 @@
         <button class="btn btn-primary" id="rotate-recovery-submit" type="submit">生成新恢复码</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 展示新的恢复码 -->
-  <template data-dialog-template="new-recovery-dialog">
-<dialog id="new-recovery-dialog" aria-labelledby="new-recovery-title">
+  <template data-dialog-template="new-recovery-dialog"><dialog id="new-recovery-dialog" aria-labelledby="new-recovery-title">
     <div class="dialog-head">
       <h2 id="new-recovery-title">保存新的恢复码</h2>
     </div>
@@ -1336,12 +1301,10 @@
       <button class="btn" type="button" data-close-dialog>取消</button>
       <button class="btn btn-primary" id="new-recovery-save" type="button">保存并上传</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 修改加密密码 -->
-  <template data-dialog-template="change-encryption-dialog">
-<dialog id="change-encryption-dialog" aria-labelledby="change-encryption-title">
+  <template data-dialog-template="change-encryption-dialog"><dialog id="change-encryption-dialog" aria-labelledby="change-encryption-title">
     <form id="change-encryption-form" novalidate>
       <div class="dialog-head">
         <h2 id="change-encryption-title">修改加密密码</h2>
@@ -1380,12 +1343,10 @@
         <button class="btn btn-primary" id="change-encryption-submit" type="submit">保存</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 解密导入文件 -->
-  <template data-dialog-template="decrypt-file-dialog">
-<dialog id="decrypt-file-dialog" aria-labelledby="decrypt-file-title">
+  <template data-dialog-template="decrypt-file-dialog"><dialog id="decrypt-file-dialog" aria-labelledby="decrypt-file-title">
     <form id="decrypt-file-form" novalidate>
       <div class="dialog-head">
         <h2 id="decrypt-file-title">解密备份文件</h2>
@@ -1411,12 +1372,10 @@
         <button class="btn btn-primary" id="decrypt-file-submit" type="submit">解密并导入</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 合并选择 -->
-  <template data-dialog-template="merge-dialog">
-<dialog id="merge-dialog" aria-labelledby="merge-title">
+  <template data-dialog-template="merge-dialog"><dialog id="merge-dialog" aria-labelledby="merge-title">
     <div class="dialog-head">
       <h2 id="merge-title">数据需要合并</h2>
     </div>
@@ -1431,12 +1390,10 @@
       <button class="btn" type="button" data-merge="local">仅用本地</button>
       <button class="btn btn-primary" type="button" data-merge="merge">合并</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 重置密码 -->
-  <template data-dialog-template="reset-dialog">
-<dialog id="reset-dialog" aria-labelledby="reset-title">
+  <template data-dialog-template="reset-dialog"><dialog id="reset-dialog" aria-labelledby="reset-title">
     <form id="reset-form" novalidate>
       <div class="dialog-head">
         <h2 id="reset-title">设置新密码</h2>
@@ -1462,12 +1419,10 @@
         <button class="btn btn-primary" id="reset-submit" type="submit">保存</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 历史版本 -->
-  <template data-dialog-template="revisions-dialog">
-<dialog id="revisions-dialog" class="history-dialog" aria-labelledby="revisions-title">
+  <template data-dialog-template="revisions-dialog"><dialog id="revisions-dialog" class="history-dialog" aria-labelledby="revisions-title">
     <div class="dialog-head">
       <h2 id="revisions-title">历史版本</h2>
       <button class="icon-close" type="button" data-close-dialog aria-label="关闭">
@@ -1489,12 +1444,10 @@
     <div class="dialog-foot">
       <button class="btn" type="button" data-close-dialog>关闭</button>
     </div>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 修改邮箱 -->
-  <template data-dialog-template="change-email-dialog">
-<dialog id="change-email-dialog" aria-labelledby="change-email-title">
+  <template data-dialog-template="change-email-dialog"><dialog id="change-email-dialog" aria-labelledby="change-email-title">
     <form id="change-email-form" novalidate>
       <div class="dialog-head">
         <h2 id="change-email-title">修改邮箱</h2>
@@ -1522,12 +1475,10 @@
         <button class="btn btn-primary" id="change-email-submit" type="submit">发送确认邮件</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 修改登录密码 -->
-  <template data-dialog-template="change-password-dialog">
-<dialog id="change-password-dialog" aria-labelledby="change-password-title">
+  <template data-dialog-template="change-password-dialog"><dialog id="change-password-dialog" aria-labelledby="change-password-title">
     <form id="change-password-form" novalidate>
       <div class="dialog-head">
         <h2 id="change-password-title">修改登录密码</h2>
@@ -1558,12 +1509,10 @@
         <button class="btn btn-primary" id="change-password-submit" type="submit">保存</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <!-- 删除账号 -->
-  <template data-dialog-template="delete-dialog">
-<dialog id="delete-dialog" aria-labelledby="delete-title">
+  <template data-dialog-template="delete-dialog"><dialog id="delete-dialog" aria-labelledby="delete-title">
     <form id="delete-form" novalidate>
       <div class="dialog-head">
         <h2 id="delete-title">删除账号</h2>
@@ -1586,26 +1535,24 @@
         <button class="btn btn-danger" id="delete-submit" type="submit">永久删除</button>
       </div>
     </form>
-  </dialog>
-</template>
+  </dialog></template>
 
   <div class="toast" id="toast" role="status" aria-live="polite" popover="manual">
     <span class="toast-message" id="toast-message"></span>
     <button class="toast-action" id="toast-action" type="button" hidden>撤销</button>
   </div>
 
-  <script src="lib/core.js?v=20261029-45" defer></script>
-  <script src="lib/store.js?v=20261029-45" defer></script>
-  <script src="lib/render.js?v=20261029-45" defer></script>
-  <script src="lib/data.js?v=20261029-45" defer></script>
-  <script src="lib/engines.js?v=20261029-45" defer></script>
-  <script src="lib/merge.js?v=20261029-45" defer></script>
-  <script src="select.js?v=20261029-45" defer></script>
-  <script src="lib/dialog.js?v=20261029-45" defer></script>
-  <script src="avatars.js?v=20261029-45" defer></script>
-  <script src="crypto.js?v=20261029-45" defer></script>
-  <script src="device-vault.js?v=20261029-45" defer></script>
-  <script src="secrets.js?v=20261029-45" defer></script>
-  <script src="app.js?v=20261029-45" defer></script>
+  <script src="lib/core.js?v=20261029-46" defer></script>
+  <script src="lib/store.js?v=20261029-46" defer></script>
+  <script src="lib/render.js?v=20261029-46" defer></script>
+  <script src="lib/data.js?v=20261029-46" defer></script>
+  <script src="lib/engines.js?v=20261029-46" defer></script>
+  <script src="lib/merge.js?v=20261029-46" defer></script>
+  <script src="select.js?v=20261029-46" defer></script>
+  <script src="lib/dialog.js?v=20261029-46" defer></script>
+  <script src="crypto.js?v=20261029-46" defer></script>
+  <script src="device-vault.js?v=20261029-46" defer></script>
+  <script src="secrets.js?v=20261029-46" defer></script>
+  <script src="app.js?v=20261029-46" defer></script>
 </body>
 </html>

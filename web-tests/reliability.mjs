@@ -161,7 +161,9 @@ async function main() {
   const hiddenSidebarInfo = JSON.parse(hiddenSidebar.value || '{}');
   check('hidden desktop sidebar is inert and restorable', hiddenSidebarInfo.hiddenState && hiddenSidebarInfo.hiddenState.inert === true && hiddenSidebarInfo.hiddenState.aria === 'true' && hiddenSidebarInfo.restoredInert === false, hiddenSidebar.value);
 
-  const avatar = await tab1.evaluate(`JSON.stringify((()=>{const m=document.getElementById('account-avatar-mini');return {text:m.textContent.trim(),art:!!m.querySelector('.avatar-art'),index:m.dataset.avatar};})())`);
+  const avatar = await tab1.evaluate(`(async()=>{const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+    for(let i=0;i<80;i++){await sleep(100);if(globalThis.QingdhAvatars)break;}
+    const m=document.getElementById('account-avatar-mini');return JSON.stringify({text:m.textContent.trim(),art:!!m.querySelector('.avatar-art'),index:m.dataset.avatar});})()`);
   const avatarInfo = JSON.parse(avatar.value || '{}');
   check('account avatar comes from the DiceBear library', avatarInfo.text === '' && avatarInfo.art === true && /^\d+$/.test(avatarInfo.index || '') && Number(avatarInfo.index) < 24, avatar.value);
 
