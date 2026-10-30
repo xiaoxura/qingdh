@@ -70,11 +70,7 @@
       promptDecryptFile,
       setStatus,
       updateSyncUI,
-      showAuthError,
       handleAuthLost,
-      loadSessions,
-      signOutLocally,
-      describeAgent,
       getData,
       setData,
     } = deps;
