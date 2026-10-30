@@ -8,13 +8,15 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#f5f6f8" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="assets/icon-192.png" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f6bf5'/%3E%3Cpath d='M20 41c0-9 5.4-16 12-16s12 7 12 16' fill='none' stroke='%23fff' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='46' r='2.6' fill='%23fff'/%3E%3C/svg%3E" />
-  <script src="boot.js?v=20261029-48"></script>
-  <link rel="stylesheet" href="styles.css?v=20261029-48" />
-  <link rel="stylesheet" href="search.css?v=20261029-48" />
-  <link rel="stylesheet" href="memo-batch.css?v=20261029-48" />
-  <link rel="stylesheet" href="select.css?v=20261029-48" />
+  <link rel="icon" href="/favicon.ico" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/assets/favicon-32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/assets/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <script src="boot.js?v=20261030-52"></script>
+  <link rel="stylesheet" href="styles.css?v=20261030-52" />
+  <link rel="stylesheet" href="search.css?v=20261030-52" />
+  <link rel="stylesheet" href="memo-batch.css?v=20261030-52" />
+  <link rel="stylesheet" href="select.css?v=20261030-52" />
 </head>
 <body>
   <div class="bg" aria-hidden="true"></div>
@@ -23,11 +25,7 @@
     <div class="sidebar-head">
       <a class="brand" id="brand-link" href="./" title="氢导航">
         <span class="brand-mark" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
-            <path d="M5 16c0-3.3 2-6 4.5-6S14 12.7 14 16" />
-            <circle cx="9.5" cy="18" r="1" fill="currentColor" stroke="none" />
-            <path d="M16.5 6.5a5 5 0 0 1 0 9" />
-          </svg>
+          <span class="brand-logo"></span>
         </span>
         <span class="sidebar-text">氢导航</span>
         <span class="brand-expand" aria-hidden="true" hidden>
@@ -234,7 +232,7 @@
     <header class="ai-results-header">
       <a class="ai-results-brand" href="/" aria-label="返回首页">
         <span class="ai-results-brand-mark" id="ai-results-brand-mark" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><path d="M5 16c0-3.3 2-6 4.5-6S14 12.7 14 16" /><circle cx="9.5" cy="18" r="1" fill="currentColor" stroke="none" /><path d="M16.5 6.5a5 5 0 0 1 0 9" /></svg>
+          <span class="brand-logo"></span>
         </span>
         <span class="ai-results-brand-name" id="ai-results-brand-name">氢导航</span>
       </a>
@@ -1542,19 +1540,22 @@
     <button class="toast-action" id="toast-action" type="button" hidden>撤销</button>
   </div>
 
-  <script src="lib/core.js?v=20261029-48" defer></script>
-  <script src="lib/store.js?v=20261029-48" defer></script>
-  <script src="lib/render.js?v=20261029-48" defer></script>
-  <script src="lib/data.js?v=20261029-48" defer></script>
-  <script src="lib/engines.js?v=20261029-48" defer></script>
-  <script src="lib/merge.js?v=20261029-48" defer></script>
-  <script src="lib/settings.js?v=20261029-48" defer></script>
-  <script src="lib/revisions.js?v=20261029-48" defer></script>
-  <script src="select.js?v=20261029-48" defer></script>
-  <script src="lib/dialog.js?v=20261029-48" defer></script>
-  <script src="crypto.js?v=20261029-48" defer></script>
-  <script src="device-vault.js?v=20261029-48" defer></script>
-  <script src="secrets.js?v=20261029-48" defer></script>
-  <script src="app.js?v=20261029-48" defer></script>
+  <script src="lib/core.js?v=20261030-52" defer></script>
+  <script src="lib/store.js?v=20261030-52" defer></script>
+  <script src="lib/render.js?v=20261030-52" defer></script>
+  <script src="lib/data.js?v=20261030-52" defer></script>
+  <script src="lib/engines.js?v=20261030-52" defer></script>
+  <script src="lib/merge.js?v=20261030-52" defer></script>
+  <script src="lib/settings.js?v=20261030-52" defer></script>
+  <script src="lib/account.js?v=20261030-52" defer></script>
+  <script src="lib/sync.js?v=20261030-52" defer></script>
+  <script src="lib/crypto-ui.js?v=20261030-52" defer></script>
+  <script src="lib/revisions.js?v=20261030-52" defer></script>
+  <script src="select.js?v=20261030-52" defer></script>
+  <script src="lib/dialog.js?v=20261030-52" defer></script>
+  <script src="crypto.js?v=20261030-52" defer></script>
+  <script src="device-vault.js?v=20261030-52" defer></script>
+  <script src="secrets.js?v=20261030-52" defer></script>
+  <script src="app.js?v=20261030-52" defer></script>
 </body>
 </html>
