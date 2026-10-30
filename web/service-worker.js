@@ -8,7 +8,7 @@
 'use strict';
 
 // 每次发布前端资源时递增版本号；新版本安装后等待用户确认再接管。
-const VERSION = '20261030-52';
+const VERSION = '20261030-53';
 const CACHE_NAME = `qingdh-shell-${VERSION}`;
 
 // 导航缓存判定单独成模块，便于 node:test 覆盖（B5）。
@@ -27,7 +27,6 @@ const SHELL_PATHS = [
   '/lib/data.js',
   '/lib/engines.js',
   '/lib/merge.js',
-  '/lib/settings.js',
   '/lib/account.js',
   '/lib/sync.js',
   '/lib/crypto-ui.js',

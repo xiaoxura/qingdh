@@ -2510,85 +2510,158 @@
     dom.groupDialog.close();
   }
 
-  const settingsUI = globalThis.QingdhSettings.create({
-    dom,
-    prefs,
-    sync,
-    state,
-    cryptoState,
-    $,
-    $$,
-    MAX_GROUPS,
-    MAX_LINKS,
-    ENGINES,
-    CLOCK_STYLES,
-    HOUR_CYCLES,
-    ICON_X,
-    escapeHTML,
-    normalizeData,
-    normalizeLink,
-    normalizeUrl,
-    clone,
-    now,
-    stampAll,
-    countGroups,
-    countLinks,
-    createDefaultData,
-    makeGroup,
-    makeLink,
-    enforceLimits,
-    currentKey,
-    formatTime,
-    readSnapshot,
-    saveSnapshot,
-    writeJSON,
-    markDirty,
-    broadcastChange,
-    render,
-    renderClock,
-    updateSnapshotButton,
-    renderEngineSettings,
-    syncSettingsSidebarUI,
-    renderSyncManager,
-    commitLocalChange,
-    showToast,
-    askConfirm,
-    api,
-    ensureDialogs,
-    withOptionalModule,
-    updateAccountUI,
-    refreshVaultState,
-    refreshPasskeyUI,
-    setAuthView,
-    authSupported,
-    ensureUnlockedForPush,
-    syncNow,
-    promptDecryptFile,
-    setStatus,
-    updateSyncUI,
-    handleAuthLost,
-    getData: () => data,
-    setData: (next) => {
-      data = next;
-    },
-  });
-  const {
-    openHub,
-    openSettings,
-    openAIConfig,
-    openAccountDialog,
-    setHubTab,
-    syncSettingsUI,
-    updateAIConfigGate,
-    exportData,
-    updateJSONImportPreview,
-    importData,
-    applyJSONImport,
-    importBookmarks,
-    applyBookmarkImport,
-    resetData,
-    restoreSnapshot,
-  } = settingsUI;
+  // 设置 Hub 只在第一次打开/修改设置时加载，避免把 8 KiB 面板塞进首屏。
+  let settingsUI = null;
+  let settingsPromise = null;
+
+  function createSettingsUI() {
+    settingsUI = globalThis.QingdhSettings.create({
+      dom,
+      prefs,
+      sync,
+      state,
+      cryptoState,
+      $,
+      $$,
+      MAX_GROUPS,
+      MAX_LINKS,
+      ENGINES,
+      CLOCK_STYLES,
+      HOUR_CYCLES,
+      ICON_X,
+      escapeHTML,
+      normalizeData,
+      normalizeLink,
+      normalizeUrl,
+      clone,
+      now,
+      stampAll,
+      countGroups,
+      countLinks,
+      createDefaultData,
+      makeGroup,
+      makeLink,
+      enforceLimits,
+      currentKey,
+      formatTime,
+      readSnapshot,
+      saveSnapshot,
+      writeJSON,
+      markDirty,
+      broadcastChange,
+      render,
+      renderClock,
+      updateSnapshotButton,
+      renderEngineSettings,
+      syncSettingsSidebarUI,
+      renderSyncManager,
+      commitLocalChange,
+      showToast,
+      askConfirm,
+      api,
+      ensureDialogs,
+      withOptionalModule,
+      updateAccountUI,
+      refreshVaultState,
+      refreshPasskeyUI,
+      setAuthView,
+      authSupported,
+      ensureUnlockedForPush,
+      syncNow,
+      promptDecryptFile,
+      setStatus,
+      updateSyncUI,
+      getData: () => data,
+      setData: (next) => {
+        data = next;
+      },
+    });
+    settingsUI.syncSettingsUI();
+    settingsUI.updateAIConfigGate();
+    return settingsUI;
+  }
+
+  function ensureSettingsUI() {
+    if (settingsUI) return Promise.resolve(settingsUI);
+    if (settingsPromise) return settingsPromise;
+    settingsPromise = loadOptionalModule('QingdhSettings')
+      .then(() => {
+        if (!globalThis.QingdhSettings) throw new Error('设置模块未加载');
+        return createSettingsUI();
+      })
+      .catch((error) => {
+        settingsPromise = null;
+        showToast('设置模块加载失败，请刷新重试');
+        throw error;
+      });
+    return settingsPromise;
+  }
+
+  function openHub(tab) {
+    ensureSettingsUI()
+      .then((ui) => ui.openHub(tab))
+      .catch(() => {});
+  }
+
+  function openSettings() {
+    openHub('account');
+  }
+
+  function openAIConfig() {
+    openHub('ai');
+  }
+
+  function openAccountDialog() {
+    ensureSettingsUI()
+      .then((ui) => ui.openAccountDialog())
+      .catch(() => {});
+  }
+
+  function setHubTab(tab) {
+    if (settingsUI) settingsUI.setHubTab(tab);
+    else ensureSettingsUI().then((ui) => ui.setHubTab(tab)).catch(() => {});
+  }
+
+  function syncSettingsUI() {
+    if (settingsUI) settingsUI.syncSettingsUI();
+    else ensureSettingsUI().then((ui) => ui.syncSettingsUI()).catch(() => {});
+  }
+
+  function updateAIConfigGate() {
+    if (settingsUI) settingsUI.updateAIConfigGate();
+  }
+
+  function updateJSONImportPreview() {
+    if (settingsUI) settingsUI.updateJSONImportPreview();
+  }
+
+  function exportData() {
+    return ensureSettingsUI().then((ui) => ui.exportData());
+  }
+
+  function importData(file) {
+    return ensureSettingsUI().then((ui) => ui.importData(file));
+  }
+
+  function applyJSONImport() {
+    return ensureSettingsUI().then((ui) => ui.applyJSONImport());
+  }
+
+  function importBookmarks(file) {
+    return ensureSettingsUI().then((ui) => ui.importBookmarks(file));
+  }
+
+  function applyBookmarkImport() {
+    return ensureSettingsUI().then((ui) => ui.applyBookmarkImport());
+  }
+
+  function resetData() {
+    return ensureSettingsUI().then((ui) => ui.resetData());
+  }
+
+  function restoreSnapshot() {
+    return ensureSettingsUI().then((ui) => ui.restoreSnapshot());
+  }
 
   /* ------------------------------------------------------------------ *
    * 确认框 / 提示条
@@ -3495,6 +3568,7 @@
     QingdhPrivacy: 'privacy.js',
     QingdhCommandPalette: 'command-palette.js',
     QingdhPasskey: 'passkey.js',
+    QingdhSettings: 'lib/settings.js',
     QingdhBookmarks: 'bookmarks.js',
     QingdhPWA: 'pwa.js',
     QingdhAvatars: 'avatars.js',
@@ -3576,7 +3650,6 @@
     applySidebar();
     restartClock();
     render();
-    syncSettingsUI();
     updateEngineUI();
     updateSyncUI();
 
